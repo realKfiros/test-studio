@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="test-studio-token" content="__SESSION_TOKEN__">
+  <title>Test Studio</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/"><span class="brand-icon">▸</span> Test Studio <span class="beta">LOCAL</span></a>
+    <div class="project"><span class="project-icon">⌘</span><div><strong id="project-name">Discovering…</strong><small>Local workspace</small></div><span class="connected" title="Connected to local server"></span></div>
+    <div class="nav-label">EXPLORER</div>
+    <nav id="runners" aria-label="Test frameworks"></nav>
+    <div class="nav-label spaced">WORKSPACES</div>
+    <nav id="workspaces" aria-label="Workspaces"></nav>
+    <div class="nav-label spaced history-label">RECENT RUNS <span id="history-count">0</span></div>
+    <nav id="history" aria-label="Recent runs"><p class="sidebar-empty">Your runs will appear here.</p></nav>
+    <div class="sidebar-footer"><span class="pulse"></span><span id="connection">Auto-discovery is on</span><small>Bun + Maestro · v0.1</small></div>
+  </aside>
+  <main>
+    <header class="topbar"><div><span class="breadcrumb">WORKSPACE / </span><select id="workspace-picker" aria-label="Workspace"><option value="all">All workspaces</option></select><span id="breadcrumb" hidden>All tests</span></div><div class="top-actions"><button class="quiet" id="history-button">◷ Runs</button><button class="quiet" id="settings-button">⚙ Run settings</button><button class="quiet" id="refresh">↻ Rescan</button></div></header>
+    <section class="page-heading"><div><div class="eyebrow">ONE PLACE TO RUN IT ALL</div><h1>Test explorer<span class="heading-dot">.</span></h1><p>Find a test. Run it. Get back to building.</p></div><button class="primary" id="run-selected" disabled>▶ Run selected <kbd id="selected-count">0</kbd></button></section>
+    <section class="stats" aria-label="Discovery summary" id="stats"></section>
+    <div id="notice" role="alert" hidden></div>
+    <section class="studio">
+      <div class="catalog">
+        <div class="catalog-toolbar"><label class="search"><span>⌕</span><input id="search" type="search" placeholder="Search files, tests, tags…" aria-label="Search files, tests, and tags"><kbd>/</kbd></label><div class="filter-row"><select id="platform" aria-label="Platform"><option value="all">All platforms</option><option value="ios">iOS</option><option value="android">Android</option></select><button class="text-button" id="select-visible">Select visible</button><button class="text-button" id="clear">Clear</button></div></div>
+        <div class="list-heading"><span>TEST FILES</span><span id="visible-count">—</span></div>
+        <div id="files" class="file-list" role="list" aria-label="Discovered test files"></div>
+        <div class="catalog-footer"><span id="scan-time">Scanning project…</span><span>↻ 5s</span></div>
+      </div>
+      <div class="inspector" id="inspector"><div class="empty-state"><span class="empty-symbol">⌕</span><h2>Discovering your tests</h2><p>Reading test declarations and flow files.</p></div></div>
+    </section>
+    <footer class="page-footer"><span>Discovered from source. No script list to maintain.</span><span id="libraries"></span></footer>
+  </main>
+  <dialog id="settings"><form method="dialog"><div class="dialog-heading"><h2>Run settings</h2><button class="icon-button" aria-label="Close settings">×</button></div><p>Maestro uses a running simulator or connected device with your app ready.</p><label>Device ID <span>optional</span><input id="device" placeholder="Automatic device selection" autocomplete="off"></label><label>Flow variables <span>one NAME=value per line</span><textarea id="env" rows="5" placeholder="APP_ID=com.example.app" spellcheck="false"></textarea></label><p class="settings-note">Variables are passed to Maestro only. Values stay in this page for this session. Existing shell environment and test configuration are inherited.</p><button class="primary">Done</button></form></dialog>
+</body>
+</html>
