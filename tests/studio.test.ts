@@ -264,6 +264,40 @@ describe("execution adapters", () => {
 	});
 });
 describe("local API boundary", () => {
+	test("serves only bundled web assets and injects a unique session into the HTML", async () => {
+		const root = await fixture({});
+		const app = await startServer(root, 0);
+		cleanup.push(() => app.stop());
+		const base = `http://127.0.0.1:${app.server.port}`;
+		const response = await fetch(base);
+		expect(response.headers.get("cache-control")).toBe("no-store");
+		expect(response.headers.get("content-security-policy")).toContain("script-src 'self';");
+		const html = await response.text();
+		expect(html).not.toContain("__SESSION_TOKEN__");
+		expect(html).toContain('name="test-studio-token"');
+		const scripts = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map((match) => match[1]);
+		expect(scripts.length).toBeGreaterThan(0);
+		for (const path of scripts) {
+			const asset = await fetch(new URL(path, base));
+			expect(asset.status).toBe(200);
+			expect(asset.headers.get("content-type")).toContain("javascript");
+			expect(asset.headers.get("x-content-type-options")).toBe("nosniff");
+		}
+		for (const path of [
+			"/server.ts",
+			"/ui/App.tsx",
+			"/package.json",
+			"/..%2Fserver.ts",
+			"/_expo/missing.js",
+		]) {
+			expect((await fetch(base + path)).status).toBe(404);
+		}
+		const head = await fetch(base, { method: "HEAD" });
+		expect(head.status).toBe(200);
+		expect(await head.text()).toBe("");
+		expect(await (await fetch(base + "/index.html")).text()).toBe(html);
+	});
+
 	test("requires the session token, rejects foreign origins and limits source access to discovered tests", async () => {
 		const root = await fixture({
 			"a.test.ts": "import {test} from 'bun:test'; test('a', () => {});",

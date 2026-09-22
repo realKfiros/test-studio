@@ -4,6 +4,7 @@ import { readFile, realpath } from "node:fs/promises";
 import { relative, sep, join } from "node:path";
 import { scanProject } from "./discovery.ts";
 import { TestRunner, validateRequest } from "./runner.ts";
+import { loadWebAssets } from "./web-assets.ts";
 export async function startServer(root: string, port?: number, loaded?: Project) {
 	const project = loaded ?? (await loadProject(root));
 	port ??= project.config.port;
@@ -12,10 +13,7 @@ export async function startServer(root: string, port?: number, loaded?: Project)
 	let scanError: Error | undefined;
 	const runner = new TestRunner(project.config.timeoutMs, project.adapters);
 	const token = crypto.randomUUID();
-	const html = (await readFile(new URL("./web/index.html", import.meta.url), "utf8")).replace(
-		"__SESSION_TOKEN__",
-		token,
-	);
+	const serveAsset = await loadWebAssets(token);
 	const refresh = () =>
 		(scanning ??= scanProject(root, project)
 			.then((value) => {
@@ -44,28 +42,13 @@ export async function startServer(root: string, port?: number, loaded?: Project)
 		)
 			return json({ error: "Invalid session" }, 403);
 		try {
-			if (request.method === "GET" && url.pathname === "/")
-				return new Response(html, {
-					headers: {
-						"Content-Type": "text/html; charset=utf-8",
-						"Cache-Control": "no-store",
-						"Content-Security-Policy":
-							"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
-						"X-Content-Type-Options": "nosniff",
-					},
-				});
-			if (request.method === "GET" && ["/app.js", "/style.css"].includes(url.pathname))
-				return new Response(
-					await readFile(new URL(`./web${url.pathname}`, import.meta.url), "utf8"),
-					{
-						headers: {
-							"Content-Type": url.pathname.endsWith(".js")
-								? "text/javascript; charset=utf-8"
-								: "text/css; charset=utf-8",
-							"X-Content-Type-Options": "nosniff",
-						},
-					},
-				);
+			if (request.method === "GET" || request.method === "HEAD") {
+				const asset = await serveAsset(decodeURIComponent(url.pathname));
+				if (asset)
+					return request.method === "HEAD"
+						? new Response(null, { headers: asset.headers })
+						: asset;
+			}
 			if (request.method === "GET" && url.pathname === "/api/catalog") return json(catalog);
 			if (request.method === "POST" && url.pathname === "/api/scan") {
 				await refresh();

@@ -227,7 +227,10 @@ describe("custom adapter execution", () => {
 			}),
 		});
 		expect(response.status).toBe(400);
-		expect((await fetch(base + "/app.js")).headers.get("content-type")).toContain("javascript");
+		const script = html.match(/<script[^>]+src="([^"]+)"/)![1];
+		expect((await fetch(new URL(script, base))).headers.get("content-type")).toContain(
+			"javascript",
+		);
 		expect(
 			(
 				await fetch(base + "/api/catalog", {
