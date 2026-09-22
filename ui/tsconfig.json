@@ -3,6 +3,7 @@
 	"compilerOptions": {
 		"strict": true,
 		"noEmit": true,
+		"allowImportingTsExtensions": true,
 		"types": ["react"],
 		"lib": ["DOM", "ES2022"]
 	},
