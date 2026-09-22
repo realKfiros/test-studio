@@ -67,6 +67,8 @@ try {
 		"styled-components",
 		"mobx",
 		"mobx-react-lite",
+		"lucide-react-native",
+		"react-native-svg",
 	])
 		assert(
 			!existsSync(join(consumer, "node_modules", dependency)),
