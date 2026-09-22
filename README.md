@@ -54,7 +54,7 @@ Optional project-root configuration can exclude additional paths without listing
 
 ```json
 {
-  "exclude": ["experiments/**", "fixtures/**"]
+	"exclude": ["experiments/**", "fixtures/**"]
 }
 ```
 
@@ -70,11 +70,22 @@ The server binds only to `127.0.0.1`, rejects unexpected hosts/origins, and requ
 
 JUnit reports and Maestro debug files go into a unique OS temporary directory for each run; the UI shows the path. History survives a browser refresh, but not a server restart. Pruning old runs deletes only their own temporary artifact directories. Retained run artifacts remain in the OS temp directory after shutdown. Output retains the last 100,000 characters per job; full JUnit reports remain on disk. Variables are redacted in command previews, but a test/runner can still print values into its own logs. Each job has a 30-minute limit. macOS/Linux process-group cancellation is supported; Windows process-tree cancellation has not been verified.
 
-## Verification
+## Formatting and verification
 
 ```sh
-bun run test
+bun run format
+bun run lint:fix
+```
+
+Prettier uses tabs with a four-column width, double quotes, semicolons, LF line endings, and a 100-column print width. ESLint applies the recommended JavaScript and TypeScript rules, with browser, Node.js, and Bun globals for the appropriate files.
+
+Run the checks before submitting changes:
+
+```sh
+bun run format:check
+bun run lint
 bun run typecheck
+bun run test
 ```
 
 The integration suite launches real Bun processes against temporary projects and a local HTTP server. It verifies discovery, ignore rules, filtering, failures, zero-result runs, cancellation, queue exclusivity, report parsing, and the local API boundary.

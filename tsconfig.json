@@ -1,8 +1,13 @@
 {
-  "compilerOptions": {
-    "target": "ESNext", "module": "Preserve", "moduleResolution": "bundler",
-    "strict": true, "noEmit": true, "allowImportingTsExtensions": true,
-    "types": ["bun-types"], "skipLibCheck": true
-  },
-  "include": ["*.ts", "tests/*.ts"]
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "Preserve",
+		"moduleResolution": "bundler",
+		"strict": true,
+		"noEmit": true,
+		"allowImportingTsExtensions": true,
+		"types": ["bun-types"],
+		"skipLibCheck": true
+	},
+	"include": ["*.ts", "tests/*.ts"]
 }
