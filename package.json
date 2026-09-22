@@ -1,7 +1,6 @@
 {
-	"name": "test-studio",
+	"name": "@kfiros/test-studio",
 	"version": "0.1.0",
-	"private": true,
 	"type": "module",
 	"scripts": {
 		"start": "node dist/cli.js",
@@ -15,7 +14,9 @@
 		"build": "node scripts/build.mjs",
 		"prepack": "npm run build",
 		"test:package": "npm run build && node scripts/smoke-package.mjs",
-		"build:ui": "node scripts/build-ui.mjs"
+		"build:ui": "node scripts/build-ui.mjs",
+		"verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:package && bun test ./tests",
+		"prepublishOnly": "npm run verify"
 	},
 	"dependencies": {
 		"fast-xml-parser": "^5.7.3",
@@ -75,5 +76,29 @@
 			"types": "./dist/adapters/maestro.d.ts",
 			"import": "./dist/adapters/maestro.js"
 		}
-	}
+	},
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/realKfiros/test-studio.git"
+	},
+	"homepage": "https://github.com/realKfiros/test-studio#readme",
+	"bugs": {
+		"url": "https://github.com/realKfiros/test-studio/issues"
+	},
+	"keywords": [
+		"testing",
+		"test-runner",
+		"test-explorer",
+		"cli",
+		"bun",
+		"maestro",
+		"adapters"
+	],
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org/"
+	},
+	"license": "MIT"
 }
