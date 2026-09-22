@@ -71,6 +71,7 @@ function filtered() {
 function summary() {
 	const c = state.catalog;
 	$("#project-name").textContent = c.name;
+	document.title = `${c.name} · Tests`;
 	$("#project-name").title = c.root;
 	const stats = [
 		["▤", c.files.length, "test files", "Auto-discovered"],
@@ -174,7 +175,7 @@ function renderInspector() {
 	const file = currentFile();
 	if (!file) {
 		$("#inspector").innerHTML =
-			'<div class="empty-state"><span class="empty-symbol">⌕</span><h2>Your next green check starts here</h2><p>Choose a file to inspect its tests, browse the source, or start a run.</p></div>';
+			'<div class="empty-state"><span class="empty-symbol">⌕</span><h2>Select a file</h2><p>Choose a file to inspect its tests, browse the source, or start a run.</p></div>';
 		return;
 	}
 	const available = state.catalog.runners.find((r) => r.id === file.runner)?.available;
@@ -186,7 +187,7 @@ function renderInspector() {
 	}
 	let content = file.note ? `<p class="note">${esc(file.note)}</p>` : "";
 	if (!supported(file))
-		content += `<p class="note">${esc(file.runner)} was detected. Enable an adapter for this framework in your Test Studio config.</p>`;
+		content += `<p class="note">${esc(file.runner)} was detected. Enable an adapter for this framework in the project configuration.</p>`;
 	else if (!available)
 		content += `<p class="note">${esc(runnerInfo(file.runner)?.executable ?? file.runner)} is unavailable. Install it in your project or add it to PATH.</p>`;
 	if (file.steps) {
@@ -255,7 +256,7 @@ function selectFile(id) {
 }
 function renderRunHistory() {
 	$("#inspector").innerHTML =
-		`<div class="inspector-heading"><button class="back-button" id="back-to-file">← Back to explorer</button><div class="inspector-title"><h2>Recent runs</h2></div><p class="inspector-path">The last 20 runs in this server session.</p></div><div class="inspector-content">${state.runs.map((run) => `<button class="job-button history-entry" data-run="${run.id}"><span class="badge ${run.status}">${run.status}</span><span class="job-name">${run.jobs.length === 1 ? esc(run.jobs[0].file.name) : `${run.jobs.length} files`}</span><span>${new Date(run.startedAt).toLocaleTimeString()}</span></button>`).join("") || '<p class="note">No runs yet. Select a file or test to get started.</p>'}</div>`;
+		`<div class="inspector-heading"><button class="back-button" id="back-to-file">← Back to tests</button><div class="inspector-title"><h2>Recent runs</h2></div><p class="inspector-path">The last 20 runs in this server session.</p></div><div class="inspector-content">${state.runs.map((run) => `<button class="job-button history-entry" data-run="${run.id}"><span class="badge ${run.status}">${run.status}</span><span class="job-name">${run.jobs.length === 1 ? esc(run.jobs[0].file.name) : `${run.jobs.length} files`}</span><span>${new Date(run.startedAt).toLocaleTimeString()}</span></button>`).join("") || '<p class="note">No runs yet. Select a file or test to get started.</p>'}</div>`;
 }
 function renderHistory() {
 	$("#history-count").textContent = state.runs.length;
@@ -265,7 +266,7 @@ function renderHistory() {
 				(run) =>
 					`<button data-run="${run.id}" class="${run.id === state.runId ? "active" : ""}"><span class="history-status ${run.status}"></span><span class="nav-text">${run.jobs.length === 1 ? esc(run.jobs[0].file.name) : `${run.jobs.length} files`}</span><span class="count">${new Date(run.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></button>`,
 			)
-			.join("") || '<p class="sidebar-empty">Your runs will appear here.</p>';
+			.join("") || '<p class="sidebar-empty">No runs yet.</p>';
 }
 function renderRun() {
 	const run = state.run;
@@ -286,7 +287,7 @@ function renderRun() {
 	const completed = run.jobs.filter((job) => !["queued", "running"].includes(job.status)).length;
 	const active = !run.finishedAt;
 	$("#inspector").innerHTML =
-		`<div class="inspector-heading run-heading"><button class="back-button" id="back-to-file">← Back to explorer</button><div class="file-overline"><span class="badge ${run.status}">${run.status.toUpperCase()}</span><span>${new Date(run.startedAt).toLocaleTimeString()}</span>${active ? '<span class="live-label">● LIVE</span>' : ""}</div><div class="inspector-title"><h2>${run.jobs.length === 1 ? esc(run.jobs[0].file.name) : `${run.jobs.length} files in this run`}</h2><div class="run-actions">${active ? '<button class="run-file stop-button" id="stop-run">■ Stop</button>' : `<button class="run-file" id="rerun">↻ Rerun</button>${run.jobs.some((job) => job.status === "failed") ? '<button class="run-file" id="rerun-failed">Rerun failed</button>' : ""}`}</div></div></div><div class="progress-track"><div class="progress-fill ${run.status}" id="progress"></div></div><div class="run-summary"><span class="passed">✓ ${counts("passed")} passed</span><span class="failed">${counts("failed")} failed</span><span>${counts("skipped")} skipped</span><span>${completed}/${run.jobs.length} files</span>${run.jobs.some((job) => job.status === "failed") ? `<span class="failed">${run.jobs.filter((job) => job.status === "failed").length} files failed</span>` : ""}<span>${duration((run.finishedAt ?? Date.now()) - run.startedAt)}</span></div><div class="job-list">${run.jobs.map((item) => `<button class="job-button ${item.id === job.id ? "active" : ""}" data-job="${item.id}"><span class="job-status ${item.status}">${item.status}</span><span class="job-name">${esc(item.file.path)}</span><span>${item.finishedAt ? duration(item.finishedAt - item.startedAt) : ""}</span></button>`).join("")}</div><div class="command-bar">${esc(job.command || "Waiting in queue…")}<br>cwd: ${esc(job.file.cwd)}</div><pre class="run-output" id="output"></pre>${job.results.length ? `<div class="run-results">${job.results.map((result) => `<div class="result-row ${result.status}"><span>${result.status === "passed" ? "✓" : result.status === "failed" ? "×" : "−"}</span><span>${esc(result.name)}</span><span class="duration">${duration(result.duration)}</span></div>${result.message ? `<pre class="result-message">${esc(result.message)}</pre>` : ""}`).join("")}</div>` : ""}<div class="run-meta"><span class="artifact-path" title="${esc(run.artifactDir)}">Reports: ${esc(run.artifactDir)}</span><span>${job.exitCode !== undefined ? `Exit ${job.exitCode ?? "signal"}` : ""}</span></div>`;
+		`<div class="inspector-heading run-heading"><button class="back-button" id="back-to-file">← Back to tests</button><div class="file-overline"><span class="badge ${run.status}">${run.status.toUpperCase()}</span><span>${new Date(run.startedAt).toLocaleTimeString()}</span>${active ? '<span class="live-label">● LIVE</span>' : ""}</div><div class="inspector-title"><h2>${run.jobs.length === 1 ? esc(run.jobs[0].file.name) : `${run.jobs.length} files in this run`}</h2><div class="run-actions">${active ? '<button class="run-file stop-button" id="stop-run">■ Stop</button>' : `<button class="run-file" id="rerun">↻ Rerun</button>${run.jobs.some((job) => job.status === "failed") ? '<button class="run-file" id="rerun-failed">Rerun failed</button>' : ""}`}</div></div></div><div class="progress-track"><div class="progress-fill ${run.status}" id="progress"></div></div><div class="run-summary"><span class="passed">✓ ${counts("passed")} passed</span><span class="failed">${counts("failed")} failed</span><span>${counts("skipped")} skipped</span><span>${completed}/${run.jobs.length} files</span>${run.jobs.some((job) => job.status === "failed") ? `<span class="failed">${run.jobs.filter((job) => job.status === "failed").length} files failed</span>` : ""}<span>${duration((run.finishedAt ?? Date.now()) - run.startedAt)}</span></div><div class="job-list">${run.jobs.map((item) => `<button class="job-button ${item.id === job.id ? "active" : ""}" data-job="${item.id}"><span class="job-status ${item.status}">${item.status}</span><span class="job-name">${esc(item.file.path)}</span><span>${item.finishedAt ? duration(item.finishedAt - item.startedAt) : ""}</span></button>`).join("")}</div><div class="command-bar">${esc(job.command || "Waiting in queue…")}<br>cwd: ${esc(job.file.cwd)}</div><pre class="run-output" id="output"></pre>${job.results.length ? `<div class="run-results">${job.results.map((result) => `<div class="result-row ${result.status}"><span>${result.status === "passed" ? "✓" : result.status === "failed" ? "×" : "−"}</span><span>${esc(result.name)}</span><span class="duration">${duration(result.duration)}</span></div>${result.message ? `<pre class="result-message">${esc(result.message)}</pre>` : ""}`).join("")}</div>` : ""}<div class="run-meta"><span class="artifact-path" title="${esc(run.artifactDir)}">Reports: ${esc(run.artifactDir)}</span><span>${job.exitCode !== undefined ? `Exit ${job.exitCode ?? "signal"}` : ""}</span></div>`;
 	$("#progress").style.width = `${(completed / run.jobs.length) * 100}%`;
 	$("#output").textContent =
 		job.output ||

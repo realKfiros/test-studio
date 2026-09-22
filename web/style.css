@@ -103,37 +103,6 @@ button.primary kbd {
 	inset: 0 auto 0 0;
 	overflow-y: auto;
 }
-.brand {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	font-size: 17px;
-	font-weight: 650;
-	letter-spacing: -0.5px;
-	padding: 0 6px;
-	white-space: nowrap;
-}
-.brand-icon {
-	display: grid;
-	place-items: center;
-	width: 25px;
-	height: 25px;
-	background: #a5d6b2;
-	color: #1d4933;
-	border-radius: 7px;
-	font-size: 23px;
-}
-.beta {
-	font:
-		8px ui-monospace,
-		monospace;
-	color: #a0b2a6;
-	border: 1px solid #4d5d53;
-	padding: 3px 4px;
-	border-radius: 3px;
-	margin-left: auto;
-	letter-spacing: 1px;
-}
 .project {
 	display: flex;
 	align-items: center;
@@ -141,7 +110,7 @@ button.primary kbd {
 	border: 1px solid #3c4e44;
 	border-radius: 8px;
 	padding: 12px 10px;
-	margin: 31px 0 29px;
+	margin: 0 0 29px;
 }
 .project-icon {
 	color: #c1cabc;
@@ -260,12 +229,6 @@ button.primary kbd {
 	color: #94b19d;
 	line-height: 1.8;
 }
-.sidebar-footer small {
-	display: block;
-	color: #677f70;
-	padding-left: 13px;
-	font-size: 9px;
-}
 .pulse {
 	display: inline-block;
 	width: 5px;
@@ -278,13 +241,20 @@ button.primary kbd {
 	background: #d88671;
 }
 main {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
 	margin-left: 224px;
 	flex: 1;
 	min-width: 0;
 	padding: 0 36px;
 }
 .topbar {
-	height: 74px;
+	min-height: 74px;
+	flex-shrink: 0;
+	flex-wrap: wrap;
+	gap: 12px;
+	padding: 16px 0;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -299,44 +269,20 @@ main {
 }
 .top-actions {
 	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
 	gap: 14px;
 }
 .quiet {
 	font-size: 11px;
 	color: #67756b;
 }
-.page-heading {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin: 32px 0 26px;
-}
-.eyebrow {
-	color: #7c8c80;
-	font-size: 9px;
-	letter-spacing: 1.7px;
-	font-weight: 650;
-}
-h1 {
-	font-size: 32px;
-	font-weight: 600;
-	letter-spacing: -1.2px;
-	line-height: 1.2;
-	margin: 10px 0;
-}
-.heading-dot {
-	color: #3f9770;
-}
-.page-heading p {
-	font-size: 12px;
-	color: #879187;
-	margin: 0;
-}
 .stats {
 	display: grid;
+	flex-shrink: 0;
 	grid-template-columns: repeat(3, 1fr);
 	gap: 14px;
-	margin-bottom: 26px;
+	margin: 24px 0;
 }
 .stat {
 	background: #fff;
@@ -387,7 +333,7 @@ h1 {
 	border: 1px solid var(--border);
 	border-radius: 10px;
 	overflow: hidden;
-	height: calc(100vh - 342px);
+	flex: 1;
 	min-height: 440px;
 	box-shadow: 0 5px 16px #1e372706;
 }
@@ -780,6 +726,7 @@ h1 {
 }
 .page-footer {
 	display: flex;
+	flex-shrink: 0;
 	justify-content: space-between;
 	padding: 15px 0;
 	color: #a1aaa0;
@@ -1049,12 +996,6 @@ dialog textarea {
 		flex-basis: 190px;
 		padding: 25px 12px;
 	}
-	.brand {
-		font-size: 15px;
-	}
-	.beta {
-		display: none;
-	}
 	main {
 		margin-left: 190px;
 		padding: 0 22px;
@@ -1084,14 +1025,6 @@ dialog textarea {
 		flex-basis: 62px;
 		padding: 24px 8px;
 	}
-	.brand {
-		font-size: 0;
-		padding: 0;
-		justify-content: center;
-	}
-	.brand-icon {
-		font-size: 22px;
-	}
 	.sidebar .project,
 	.sidebar .nav-label,
 	.sidebar .sidebar-footer,
@@ -1100,9 +1033,6 @@ dialog textarea {
 	.sidebar .nav-text,
 	.sidebar .count {
 		display: none;
-	}
-	.sidebar #runners {
-		margin-top: 35px;
 	}
 	.sidebar nav button {
 		justify-content: center;
@@ -1131,12 +1061,6 @@ dialog textarea {
 	.studio {
 		grid-template-columns: 260px minmax(0, 1fr);
 	}
-	.page-heading h1 {
-		font-size: 27px;
-	}
-	.page-heading p {
-		font-size: 10px;
-	}
 	.page-footer {
 		font-size: 8px;
 	}
@@ -1147,12 +1071,15 @@ dialog textarea {
 		flex-wrap: wrap;
 	}
 	.topbar {
-		height: 60px;
+		min-height: 60px;
 	}
 }
 @media (max-width: 600px) {
+	main {
+		height: auto;
+	}
 	.stats {
-		margin-bottom: 16px;
+		margin: 16px 0;
 	}
 	.studio {
 		display: flex;
@@ -1169,16 +1096,10 @@ dialog textarea {
 		min-height: 450px;
 		max-height: 650px;
 	}
-	.page-heading {
-		align-items: start;
-		gap: 12px;
-	}
-	.page-heading .primary {
+	.top-actions .primary {
 		font-size: 10px;
-		padding: 10px;
-	}
-	.eyebrow {
-		font-size: 7px;
+		padding: 8px;
+		gap: 6px;
 	}
 	.top-actions {
 		gap: 7px;
@@ -1188,10 +1109,6 @@ dialog textarea {
 	}
 	.breadcrumb {
 		display: none;
-	}
-	.page-heading p {
-		max-width: 170px;
-		line-height: 1.6;
 	}
 	.page-footer {
 		display: block;

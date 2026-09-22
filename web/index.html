@@ -4,15 +4,12 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="test-studio-token" content="__SESSION_TOKEN__" />
-		<title>Test Studio</title>
+		<title>Tests</title>
 		<link rel="stylesheet" href="/style.css" />
 		<script src="/app.js" defer></script>
 	</head>
 	<body>
 		<aside class="sidebar">
-			<a class="brand" href="/"
-				><span class="brand-icon">▸</span> Test Studio <span class="beta">LOCAL</span></a
-			>
 			<div class="project">
 				<span class="project-icon">⌘</span>
 				<div>
@@ -28,11 +25,10 @@
 				RECENT RUNS <span id="history-count">0</span>
 			</div>
 			<nav id="history" aria-label="Recent runs">
-				<p class="sidebar-empty">Your runs will appear here.</p>
+				<p class="sidebar-empty">No runs yet.</p>
 			</nav>
 			<div class="sidebar-footer">
-				<span class="pulse"></span><span id="connection">Auto-discovery is on</span
-				><small>Your project · Your test tools</small>
+				<span class="pulse"></span><span id="connection">Auto-discovery is on</span>
 			</div>
 		</aside>
 		<main>
@@ -47,18 +43,11 @@
 					<button class="quiet" id="history-button">◷ Runs</button
 					><button class="quiet" id="settings-button">⚙ Run settings</button
 					><button class="quiet" id="refresh">↻ Rescan</button>
+					<button class="primary" id="run-selected" disabled>
+						▶ Run selected <kbd id="selected-count">0</kbd>
+					</button>
 				</div>
 			</header>
-			<section class="page-heading">
-				<div>
-					<div class="eyebrow">ONE PLACE TO RUN IT ALL</div>
-					<h1>Test explorer<span class="heading-dot">.</span></h1>
-					<p>Find a test. Run it. Get back to building.</p>
-				</div>
-				<button class="primary" id="run-selected" disabled>
-					▶ Run selected <kbd id="selected-count">0</kbd>
-				</button>
-			</section>
 			<section class="stats" aria-label="Discovery summary" id="stats"></section>
 			<div id="notice" role="alert" hidden></div>
 			<section class="studio">
@@ -104,8 +93,7 @@
 				</div>
 			</section>
 			<footer class="page-footer">
-				<span>Discovered from source. No script list to maintain.</span
-				><span id="libraries"></span>
+				<span id="libraries"></span>
 			</footer>
 		</main>
 		<dialog id="settings">
