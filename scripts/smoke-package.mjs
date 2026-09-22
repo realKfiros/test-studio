@@ -17,6 +17,17 @@ const npx = join(dirname(npm), "npx-cli.js");
 const temp = await mkdtemp(join(tmpdir(), "test-studio-package-"));
 let child;
 const artifacts = new Set();
+function hasExited(subprocess) {
+	return subprocess.exitCode !== null || subprocess.signalCode !== null;
+}
+function stopProcess(subprocess, signal) {
+	try {
+		if (process.platform === "win32") subprocess.kill(signal);
+		else process.kill(-subprocess.pid, signal);
+	} catch (error) {
+		if (error.code !== "ESRCH") throw error;
+	}
+}
 function run(args, cwd = repo) {
 	return execFileSync(process.execPath, [npm, ...args], {
 		cwd,
@@ -219,6 +230,7 @@ void adapter; void config;`,
 			cwd: consumer,
 			env: { ...process.env, PATH: `${bin}:/usr/bin:/bin` },
 			stdio: ["ignore", "pipe", "pipe"],
+			detached: process.platform !== "win32",
 		});
 		let output = "";
 		child.stdout.on("data", (chunk) => {
@@ -229,8 +241,8 @@ void adapter; void config;`,
 		});
 		const base = await waitUntil(
 			() => {
-				if (child.exitCode !== null)
-					throw new Error(`CLI exited ${child.exitCode}: ${output}`);
+				if (hasExited(child))
+					throw new Error(`CLI exited ${child.exitCode ?? child.signalCode}: ${output}`);
 				return output.match(/http:\/\/127\.0\.0\.1:\d+/)?.[0];
 			},
 			() => `CLI did not start: ${output}`,
@@ -273,8 +285,16 @@ void adapter; void config;`,
 		}, "Packed adapter run did not finish");
 		assert.equal(completed.status, "passed", completed.jobs[0].output);
 		assert(completed.jobs[0].results.some((result) => result.name.includes("packed pass")));
-		child.kill("SIGTERM");
-		await waitUntil(() => child.exitCode !== null, "UI server did not stop after SIGTERM");
+		stopProcess(child, "SIGTERM");
+		await waitUntil(() => hasExited(child), "UI launcher did not stop after SIGTERM");
+		await waitUntil(async () => {
+			try {
+				await fetch(base, { signal: AbortSignal.timeout(500) });
+				return false;
+			} catch {
+				return true;
+			}
+		}, "UI server still responds after SIGTERM");
 		child = undefined;
 	}
 	const invalid = spawn(
@@ -287,10 +307,14 @@ void adapter; void config;`,
 		"Package smoke test passed: npx/bunx tarball launch, init, typed config, SDK exports, terminal exit codes, plugin execution, ignore rules, and compiled UI assets on Node.",
 	);
 } finally {
-	if (child && child.exitCode === null) {
-		child.kill("SIGTERM");
-		await Promise.race([new Promise((resolve) => child.once("exit", resolve)), delay(3000)]);
-		if (child.exitCode === null) child.kill("SIGKILL");
+	if (child) {
+		stopProcess(child, "SIGTERM");
+		if (!hasExited(child))
+			await Promise.race([
+				new Promise((resolve) => child.once("exit", resolve)),
+				delay(3000),
+			]);
+		stopProcess(child, "SIGKILL");
 	}
 	for (const path of artifacts) await rm(path, { recursive: true, force: true });
 	await rm(temp, { recursive: true, force: true });
