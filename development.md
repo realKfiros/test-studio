@@ -171,4 +171,4 @@ Tests live in `tests/` and use temporary projects and real subprocesses where ne
 
 Keep the change focused, describe its user-visible effect, and list the checks you ran. Include before/after screenshots for UI work. Update the README or usage reference when behavior changes, and the adapter guide when the public contract changes.
 
-For packaging and publication, follow [Publishing releases](docs/releases.md). Builds and tests do not publish anything.
+GitHub Actions runs the complete verification on pushes to `master` and pull requests. For packaging and publication, follow [Publishing releases](docs/releases.md). Pushing a matching version tag triggers the npm release workflow; builds and tests alone do not publish anything.
