@@ -22,13 +22,13 @@ npm version patch --no-git-tag-version
 bun install --lockfile-only
 ```
 
-Use `minor` or `major` when appropriate. Inspect the changes, then commit and push the matching version tag. For example, for `0.1.1`:
+Use `minor` or `major` when appropriate. Inspect the changes, then commit and push the matching version tag. For example, for `0.1.2`:
 
 ```sh
 git add package.json bun.lock
-git commit -m "chore: release 0.1.1"
-git tag v0.1.1
-git push --atomic origin master v0.1.1
+git commit -m "chore: release 0.1.2"
+git tag v0.1.2
+git push --atomic origin master v0.1.2
 ```
 
 Follow the [Publish to npm workflow](https://github.com/realKfiros/test-studio/actions/workflows/publish.yml). Verification failures stop publication. Fix failures with a new release commit and version rather than moving a published tag. If a run fails for a temporary infrastructure or authentication problem before publishing, rerun the failed workflow in GitHub Actions. Check npm first: a published name/version pair cannot be reused.
@@ -76,8 +76,8 @@ npm scans newly published versions before making them installable. A successful 
 From outside this checkout, verify the released version:
 
 ```sh
-npx @kfiros/test-studio@0.1.1 --version
-bunx @kfiros/test-studio@0.1.1 --version
+npx @kfiros/test-studio@0.1.2 --version
+bunx @kfiros/test-studio@0.1.2 --version
 ```
 
-Replace `0.1.1` with the version being released. Publication behavior follows the [npm publish documentation](https://docs.npmjs.com/cli/v11/commands/npm-publish/).
+Replace `0.1.2` with the version being released. Publication behavior follows the [npm publish documentation](https://docs.npmjs.com/cli/v11/commands/npm-publish/).
