@@ -19,7 +19,9 @@ const state = {
 	jobId: null,
 	showHistory: false,
 };
-const supported = (file) => ["bun", "maestro"].includes(file.runner);
+const runnerInfo = (id) => state.catalog?.runners.find((runner) => runner.id === id);
+const supported = (file) => !!runnerInfo(file.runner);
+const selectable = (file) => !!runnerInfo(file.runner)?.supportsIndividualTests;
 const token = $('meta[name="test-studio-token"]').content;
 let polling = false;
 let sourceRequest = 0;
@@ -75,9 +77,9 @@ function summary() {
 		["⌘", c.files.reduce((n, f) => n + f.cases.length, 0), "test declarations", "From source"],
 		[
 			"◈",
-			c.files.filter((f) => f.runner === "maestro").length,
-			"Maestro flows",
-			"iOS + Android",
+			c.runners.length,
+			"active adapters",
+			`${c.runners.filter((runner) => runner.available).length} tools available`,
 		],
 	];
 	$("#stats").innerHTML = stats
@@ -91,12 +93,16 @@ function summary() {
 		`Scanned ${new Date(c.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
 	$("#runners").innerHTML = [
 		["all", "▦", "All tests"],
-		["bun", "◉", "Bun tests"],
-		["maestro", "◈", "Maestro flows"],
+		...[
+			...new Set([
+				...c.runners.map((runner) => runner.id),
+				...c.files.map((file) => file.runner),
+			]),
+		].map((id) => [id, "◉", runnerInfo(id)?.label ?? id]),
 	]
 		.map(
 			([id, icon, label]) =>
-				`<button data-runner="${id}" aria-label="${label}" title="${label}" class="${state.runner === id ? "active" : ""}"><span class="nav-icon">${icon}</span><span class="nav-text">${label}</span><span class="count">${c.files.filter((f) => id === "all" || f.runner === id).length}</span></button>`,
+				`<button data-runner="${esc(id)}" aria-label="${esc(label)}" title="${esc(label)}" class="${state.runner === id ? "active" : ""}"><span class="nav-icon">${icon}</span><span class="nav-text">${esc(label)}</span><span class="count">${c.files.filter((f) => id === "all" || f.runner === id).length}</span></button>`,
 		)
 		.join("");
 	const workspaces = [...new Set(c.files.map((f) => f.workspace))].sort();
@@ -122,9 +128,7 @@ function summary() {
 			? state.workspace
 			: state.runner === "all"
 				? "All tests"
-				: state.runner === "bun"
-					? "Bun tests"
-					: "Maestro flows";
+				: (runnerInfo(state.runner)?.label ?? state.runner);
 }
 function renderFiles() {
 	const files = filtered();
@@ -139,9 +143,8 @@ function renderFiles() {
 						? `<div class="workspace-heading"><span>⌄</span>${esc(file.workspace === "." ? "Project root" : file.workspace)}<span>${files.filter((f) => f.workspace === file.workspace).length}</span></div>`
 						: "";
 				workspace = file.workspace;
-				const count =
-					file.runner === "maestro" ? `${file.steps?.length ?? 0}` : file.cases.length;
-				return `${heading}<div class="file-row ${state.file?.id === file.id ? "active" : ""}" role="listitem"><input type="checkbox" data-file-check="${esc(file.id)}" aria-label="Select ${esc(file.name)}" ${state.selected.has(file.id) ? "checked" : ""} ${supported(file) ? "" : "disabled"}><button class="file-open" data-file="${esc(file.id)}" title="${esc(file.path)}"><span class="file-icon ${esc(file.runner)}">${file.runner === "maestro" ? "M" : "TS"}</span><span class="file-info"><span class="file-title">${esc(file.name)}</span><span class="file-path">${esc(file.path.slice(file.workspace === "." ? 0 : file.workspace.length + 1))}</span></span><span class="file-meta">${count}</span></button></div>`;
+				const count = file.steps ? `${file.steps?.length ?? 0}` : file.cases.length;
+				return `${heading}<div class="file-row ${state.file?.id === file.id ? "active" : ""}" role="listitem"><input type="checkbox" data-file-check="${esc(file.id)}" aria-label="Select ${esc(file.name)}" ${state.selected.has(file.id) ? "checked" : ""} ${supported(file) ? "" : "disabled"}><button class="file-open" data-file="${esc(file.id)}" title="${esc(file.path)}"><span class="file-icon ${esc(file.runner)}">${esc((runnerInfo(file.runner)?.label ?? file.runner).slice(0, 2).toUpperCase())}</span><span class="file-info"><span class="file-title">${esc(file.name)}</span><span class="file-path">${esc(file.path.slice(file.workspace === "." ? 0 : file.workspace.length + 1))}</span></span><span class="file-meta">${count}</span></button></div>`;
 			})
 			.join("") || '<div class="small-empty">No tests match these filters.</div>';
 	document.querySelectorAll("[data-file-check]").forEach((input) => {
@@ -176,18 +179,18 @@ function renderInspector() {
 	}
 	const available = state.catalog.runners.find((r) => r.id === file.runner)?.available;
 	$("#inspector").innerHTML =
-		`<div class="inspector-heading"><div class="file-overline"><span class="badge ${esc(file.runner)}">${esc(file.runner.toUpperCase())}</span>${file.platform ? `<span class="badge">${esc(file.platform)}</span>` : ""}<span>${file.runner === "maestro" ? `${file.steps.length} steps` : `${file.cases.length} declarations`}</span></div><div class="inspector-title"><h2>${esc(file.name)}</h2><button class="run-file" data-run-file="${esc(file.id)}" ${supported(file) && available ? "" : "disabled"}>▶ Run ${file.runner === "maestro" ? "flow" : "file"}</button></div><div class="inspector-path">${esc(file.path)}</div></div><div class="tabs"><button class="tab ${state.tab === "tests" ? "active" : ""}" data-tab="tests">${file.runner === "maestro" ? "Flow steps" : "Tests"}</button><button class="tab ${state.tab === "source" ? "active" : ""}" data-tab="source">Source</button></div><div class="inspector-content" id="file-content"></div>`;
+		`<div class="inspector-heading"><div class="file-overline"><span class="badge ${esc(file.runner)}">${esc(file.runner.toUpperCase())}</span>${file.platform ? `<span class="badge">${esc(file.platform)}</span>` : ""}<span>${file.steps ? `${file.steps.length} steps` : `${file.cases.length} declarations`}</span></div><div class="inspector-title"><h2>${esc(file.name)}</h2><button class="run-file" data-run-file="${esc(file.id)}" ${supported(file) && available ? "" : "disabled"}>▶ Run ${file.steps ? "flow" : "file"}</button></div><div class="inspector-path">${esc(file.path)}</div></div><div class="tabs"><button class="tab ${state.tab === "tests" ? "active" : ""}" data-tab="tests">${file.steps ? "Flow steps" : "Tests"}</button><button class="tab ${state.tab === "source" ? "active" : ""}" data-tab="source">Source</button></div><div class="inspector-content" id="file-content"></div>`;
 	if (state.tab === "source") {
 		renderSource(file);
 		return;
 	}
 	let content = file.note ? `<p class="note">${esc(file.note)}</p>` : "";
 	if (!supported(file))
-		content += `<p class="note">${esc(file.runner)} was detected. Execution adapters currently support Bun and Maestro.</p>`;
+		content += `<p class="note">${esc(file.runner)} was detected. Enable an adapter for this framework in your Test Studio config.</p>`;
 	else if (!available)
-		content += `<p class="note">${esc(file.runner)} is missing from PATH. Install it and restart Test Studio.</p>`;
-	if (file.runner === "maestro") {
-		content += `<p class="note">App: ${esc(file.appId)}${file.tags?.length ? ` · Tags: ${esc(file.tags.join(", "))}` : ""}<br>Runs the complete flow on your selected device. Start the app and any required services first.</p>`;
+		content += `<p class="note">${esc(runnerInfo(file.runner)?.executable ?? file.runner)} is unavailable. Install it in your project or add it to PATH.</p>`;
+	if (file.steps) {
+		content += `<p class="note">${file.appId ? `App: ${esc(file.appId)}` : "Flow"}${file.tags?.length ? ` · Tags: ${esc(file.tags.join(", "))}` : ""}<br>Runs the complete flow. Start any required devices, apps, and services first.</p>`;
 		content += file.steps
 			.map(
 				(step, index) =>
@@ -209,7 +212,7 @@ function renderInspector() {
 					state.selected.has(file.id) &&
 					(state.selected.get(file.id) === null ||
 						state.selected.get(file.id)?.has(test.id));
-				return `${heading}<div class="test-row"><input type="checkbox" data-case-check="${esc(test.id)}" aria-label="Select test ${esc(test.fullName)}" ${selected ? "checked" : ""} ${test.runnable && supported(file) ? "" : "disabled"}><span class="test-name">${esc(test.name)}</span>${test.mode !== "normal" ? `<span class="badge">${esc(test.mode)}</span>` : ""}<span class="test-line">:${test.line}</span><button class="test-play" data-run-case="${esc(test.id)}" aria-label="Run test ${esc(test.fullName)}" ${test.runnable && supported(file) && available ? "" : "disabled"}>▷</button></div>`;
+				return `${heading}<div class="test-row"><input type="checkbox" data-case-check="${esc(test.id)}" aria-label="Select test ${esc(test.fullName)}" ${selected ? "checked" : ""} ${test.runnable && selectable(file) ? "" : "disabled"}><span class="test-name">${esc(test.name)}</span>${test.mode !== "normal" ? `<span class="badge">${esc(test.mode)}</span>` : ""}<span class="test-line">:${test.line}</span><button class="test-play" data-run-case="${esc(test.id)}" aria-label="Run test ${esc(test.fullName)}" ${test.runnable && selectable(file) && available ? "" : "disabled"}>▷</button></div>`;
 			})
 			.join("");
 		if (!file.cases.length)
@@ -336,8 +339,7 @@ function applyCatalog(catalog) {
 			if (!cases.size) state.selected.delete(id);
 		}
 	}
-	if (!state.file)
-		state.file = catalog.files.find((file) => file.runner === "bun") ?? catalog.files[0];
+	if (!state.file) state.file = catalog.files.find((file) => supported(file)) ?? catalog.files[0];
 	summary();
 	if (changed) {
 		renderFiles();

@@ -137,25 +137,25 @@ describe("execution adapters", () => {
 			name: "flow",
 			cases: [],
 		};
-		const command = adapters[1].command(
-			"/tmp/project",
+		const command = adapters[1].command({
+			root: "/tmp/project",
 			file,
-			{ fileId: file.id },
-			"/tmp/report.xml",
-			{ device: "device-1", env: { QUERY: "$(touch /tmp/no); private" } },
-		);
+			selection: { fileId: file.id },
+			reportPath: "/tmp/report.xml",
+			options: { device: "device-1", env: { QUERY: "$(touch /tmp/no); private" } },
+		});
 		expect(command.args.slice(0, 3)).toEqual(["--device", "device-1", "test"]);
 		expect(command.args).toContain("QUERY=$(touch /tmp/no); private");
 		expect(displayCommand(command)).not.toContain("private");
 		expect(displayCommand(command)).toContain("<redacted>");
 		expect(() =>
-			adapters[1].command(
-				"/tmp/project",
+			adapters[1].command({
+				root: "/tmp/project",
 				file,
-				{ fileId: file.id, caseIds: ["step"] },
-				"report",
-				{},
-			),
+				selection: { fileId: file.id, caseIds: ["step"] },
+				reportPath: "report",
+				options: {},
+			}),
 		).toThrow();
 	});
 	test("parses nested Bun and flat Maestro JUnit reports including failed and skipped cases", () => {

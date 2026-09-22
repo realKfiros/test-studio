@@ -1,9 +1,13 @@
-import { readdir, readFile, stat, realpath } from "node:fs/promises";
-import { basename, dirname, join, relative, sep } from "node:path";
+import { readdir, readFile, stat } from "node:fs/promises";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
-import ts from "typescript";
-import { parseAllDocuments, isSeq, isMap, isScalar } from "yaml";
-import type { Catalog, TestCase, TestFile } from "./types.ts";
+import ignore from "ignore";
+import { executablePath } from "./adapters.ts";
+import { loadProject, isRecord, type Project } from "./config.ts";
+import { discoverScript, testPath } from "./detectors.ts";
+import type { Manifest, DiscoveredFile } from "./adapter.ts";
+import type { Catalog, TestFile } from "./types.ts";
+export { discoverScript, discoverMaestro } from "./detectors.ts";
 const ignored = new Set([
 	"node_modules",
 	".git",
@@ -14,271 +18,118 @@ const ignored = new Set([
 	"Pods",
 	"DerivedData",
 	"graphify-out",
-	"android",
-	"ios",
 	"test-results",
 	"playwright-report",
+	".idea",
+	".vscode",
 ]);
-const testPath = /(?:[._](?:test|spec))\.[cm]?[jt]sx?$|(?:^|\/)__tests__\/.*\.[cm]?[jt]sx?$/;
-const imports = new Map([
-	["bun:test", "bun"],
-	["vitest", "vitest"],
-	["@jest/globals", "jest"],
-	["node:test", "node:test"],
-	["@playwright/test", "playwright"],
-]);
-const cache = new Map<
-	string,
-	{
-		stamp: string;
-		value: Partial<TestFile> | null;
-	}
->();
-const literal = (node?: ts.Node): string | undefined =>
-	node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
-		? node.text
-		: undefined;
-/** Parse declarations without importing test code (and therefore without running hooks). */
-export function discoverScript(
-	source: string,
-	path: string,
-	fallback = "unknown",
-): Partial<TestFile> {
-	const ast = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
-	const aliases = new Map<string, string>();
-	const namespaces = new Set<string>();
-	let runner = fallback;
-	for (const statement of ast.statements) {
-		if (!ts.isImportDeclaration(statement)) continue;
-		const framework = imports.get(literal(statement.moduleSpecifier) ?? "");
-		if (!framework) continue;
-		runner = framework;
-		const bindings = statement.importClause?.namedBindings;
-		if (bindings && ts.isNamedImports(bindings))
-			for (const item of bindings.elements)
-				aliases.set(item.name.text, item.propertyName?.text ?? item.name.text);
-		if (bindings && ts.isNamespaceImport(bindings)) namespaces.add(bindings.name.text);
-		if (statement.importClause?.name) aliases.set(statement.importClause.name.text, "test");
-	}
-	const cases: TestCase[] = [];
-	function callParts(expr: ts.Expression): string[] {
-		if (ts.isIdentifier(expr)) return [aliases.get(expr.text) ?? expr.text];
-		if (ts.isPropertyAccessExpression(expr)) {
-			if (ts.isIdentifier(expr.expression) && namespaces.has(expr.expression.text))
-				return [expr.name.text];
-			return [...callParts(expr.expression), expr.name.text];
-		}
-		if (ts.isCallExpression(expr) || ts.isTaggedTemplateExpression(expr))
-			return callParts(ts.isCallExpression(expr) ? expr.expression : expr.tag);
-		return [];
-	}
-	function visit(node: ts.Node, parents: string[], dynamic: boolean, inheritedMode: string) {
-		if (ts.isCallExpression(node)) {
-			const parts = callParts(node.expression);
-			const kind = parts[0];
-			if (["describe", "test", "it"].includes(kind)) {
-				const callback = node.arguments.find(
-					(arg) => ts.isArrowFunction(arg) || ts.isFunctionExpression(arg),
-				);
-				const name = literal(node.arguments[0]);
-				const isDeclaration = callback || parts.includes("todo");
-				if (isDeclaration) {
-					const line = ast.getLineAndCharacterOfPosition(node.getStart(ast)).line + 1;
-					const uncertain =
-						dynamic ||
-						name === undefined ||
-						parts.some((part) => ["each", "for"].includes(part));
-					const mode =
-						parts.find((part) => ["skip", "todo", "only"].includes(part)) ??
-						inheritedMode;
-					const label = name ?? node.arguments[0]?.getText(ast) ?? "Unnamed test";
-					if (kind === "describe") {
-						if (
-							callback &&
-							(ts.isArrowFunction(callback) || ts.isFunctionExpression(callback))
-						)
-							visit(callback.body, [...parents, label], uncertain, mode);
-					} else {
-						const fullName = [...parents, label].join(" ");
-						cases.push({
-							id: `${path}:${line}:${cases.length}:${Bun.hash(fullName)}`,
-							name: label,
-							fullName,
-							line,
-							mode: uncertain ? "dynamic" : mode,
-							runnable: !uncertain && !["skip", "todo"].includes(mode),
-						});
-					}
-					return;
-				}
-			}
-		}
-		// Names generated inside loops cannot be selected reliably with a static name filter.
-		const loop =
-			ts.isForStatement(node) ||
-			ts.isForOfStatement(node) ||
-			ts.isForInStatement(node) ||
-			ts.isWhileStatement(node) ||
-			ts.isFunctionDeclaration(node) ||
-			ts.isFunctionExpression(node) ||
-			ts.isArrowFunction(node);
-		ts.forEachChild(node, (child) => visit(child, parents, dynamic || loop, inheritedMode));
-	}
-	visit(ast, [], false, "normal");
-	const names = new Map<string, number>();
-	for (const item of cases) names.set(item.fullName, (names.get(item.fullName) ?? 0) + 1);
-	for (const item of cases)
-		if (names.get(item.fullName)! > 1 && item.runnable) {
-			item.mode = "duplicate";
-			item.runnable = false;
-		}
-	return {
-		runner,
-		cases,
-		note:
-			runner === "unknown"
-				? "No supported test library was identified. Add an explicit bun:test import for Bun tests."
-				: cases.some((item) => ["dynamic", "duplicate"].includes(item.mode))
-					? "Generated or duplicate test names run at file level. Individual selection is available for unique static names."
-					: undefined,
-	};
-}
-export function discoverMaestro(source: string, path: string): Partial<TestFile> | null {
-	const documents = parseAllDocuments(source);
-	if (documents.some((doc) => doc.errors.length)) {
-		if (/^appId:/m.test(source)) throw new Error("Invalid Maestro YAML");
-		return null;
-	}
-	const config = documents[0]?.toJS();
-	if (!config || typeof config.appId !== "string" || !isSeq(documents[1]?.contents)) return null;
-	const sequence = documents[1].contents;
-	const steps = sequence.items.map((node) => {
-		const value = isMap(node) ? node.toJSON() : isScalar(node) ? node.value : node;
-		const key = value && typeof value === "object" ? Object.keys(value)[0] : String(value);
-		const detail = value && typeof value === "object" ? value[key] : undefined;
-		const label =
-			typeof detail === "string" || typeof detail === "number"
-				? detail
-				: (detail?.label ?? detail?.text ?? detail?.id);
-		const offset =
-			node && typeof node === "object" && "range" in node ? (node.range?.[0] ?? 0) : 0;
-		return {
-			name: label ? `${key}: ${label}` : key,
-			line: source.slice(0, offset).split("\n").length,
-		};
-	});
-	return {
-		runner: "maestro",
-		name:
-			typeof config.name === "string" ? config.name : basename(path).replace(/\.ya?ml$/, ""),
-		appId: config.appId,
-		platform: /(?:-|\.)ios\.ya?ml$/.test(path)
-			? "ios"
-			: /(?:-|\.)android\.ya?ml$/.test(path)
-				? "android"
-				: "any",
-		tags: Array.isArray(config.tags) ? config.tags.map(String) : [],
-		cases: [],
-		steps,
-	};
-}
-export async function scanProject(rootInput: string): Promise<Catalog> {
-	const root = await realpath(rootInput);
-	const files: string[] = [];
+const posix = (path: string) => path.split(sep).join("/");
+/** Walk once for every adapter. Detection only reads source, never imports test modules. */
+export async function scanProject(rootInput: string, loaded?: Project): Promise<Catalog> {
+	const project = loaded ?? (await loadProject(rootInput));
+	const { root, config, adapters } = project;
+	const paths: string[] = [];
 	const warnings: string[] = [];
-	const manifests = new Map<
-		string,
-		{
-			name?: string;
-			scripts?: Record<string, string>;
-			dependencies?: Record<string, string>;
-			devDependencies?: Record<string, string>;
+	const manifests = new Map<string, Manifest>();
+	const excluded = ignore().add(config.exclude);
+	if (config.ignoreFile !== false) {
+		try {
+			excluded.add(await readFile(resolve(root, config.ignoreFile), "utf8"));
+		} catch (cause) {
+			if (
+				(cause as NodeJS.ErrnoException).code !== "ENOENT" ||
+				config.ignoreFile !== ".teststudioignore"
+			)
+				throw new Error(
+					`Unable to read ignore file ${config.ignoreFile}: ${(cause as Error).message}`,
+					{ cause },
+				);
 		}
-	>();
-	const bunConfigs = new Set<string>();
-	// Git knows about generated output directories without hardcoding project-specific paths.
-	// Include untracked files, so a newly written test appears before it is committed.
-	const git = spawnSync(
-		"git",
-		["-C", root, "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
-		{ encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
-	);
-	const gitFiles = git.status === 0 ? new Set(git.stdout.split("\0")) : null;
+	}
+	const git = config.respectGitignore
+		? spawnSync(
+				"git",
+				["-C", root, "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+				{ encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
+			)
+		: undefined;
+	const gitFiles = git?.status === 0 ? new Set(git.stdout.split("\0").filter(Boolean)) : null;
 	const gitDirectories = new Set<string>();
 	for (const path of gitFiles ?? []) {
 		let dir = dirname(path);
 		while (dir !== ".") {
-			gitDirectories.add(dir);
+			gitDirectories.add(posix(dir));
 			dir = dirname(dir);
 		}
 	}
-	let exclude: string[] = [];
-	try {
-		const config = JSON.parse(await readFile(join(root, "test-studio.config.json"), "utf8"));
-		if (
-			!Array.isArray(config.exclude) ||
-			config.exclude.some((item: unknown) => typeof item !== "string")
-		)
-			throw new Error("exclude must be an array of glob strings");
-		exclude = config.exclude;
-	} catch (cause) {
-		const error = cause as NodeJS.ErrnoException;
-		if (error.code !== "ENOENT") warnings.push(`test-studio.config.json: ${error.message}`);
-	}
-	const patterns = exclude.map((pattern) => new Bun.Glob(pattern));
-	async function walk(dir: string) {
+	async function walk(
+		dir: string,
+		gitRules: { base: string; matcher: ReturnType<typeof ignore> }[],
+	) {
 		const entries = await readdir(dir, { withFileTypes: true });
-		// Nested checkouts and submodules are separate projects, not part of this catalog.
 		if (dir !== root && entries.some((entry) => entry.name === ".git")) return;
+		// Honor nested .gitignore files even in directories that have not been initialized with Git.
+		if (
+			config.respectGitignore &&
+			!gitFiles &&
+			entries.some((entry) => entry.name === ".gitignore")
+		) {
+			gitRules = [
+				...gitRules,
+				{
+					base: dir,
+					matcher: ignore().add(await readFile(join(dir, ".gitignore"), "utf8")),
+				},
+			];
+		}
 		for (const entry of entries) {
 			const absolute = join(dir, entry.name);
-			const path = relative(root, absolute).split(sep).join("/");
-			if (
-				entry.isSymbolicLink() ||
-				patterns.some((pattern) => pattern.match(path) || pattern.match(`${path}/`))
-			)
-				continue;
+			const path = posix(relative(root, absolute));
+			const matchPath = entry.isDirectory() ? `${path}/` : path;
+			if (entry.isSymbolicLink() || excluded.ignores(matchPath)) continue;
+			let gitIgnored = false;
+			for (const rule of gitRules) {
+				const match = rule.matcher.test(
+					posix(relative(rule.base, absolute)) + (entry.isDirectory() ? "/" : ""),
+				);
+				if (match.ignored) gitIgnored = true;
+				else if (match.unignored) gitIgnored = false;
+			}
+			if (gitIgnored) continue;
 			if (entry.isDirectory()) {
-				if (gitFiles && !gitDirectories.has(path)) continue;
-				if (
-					!ignored.has(entry.name) &&
-					(!entry.name.startsWith(".") || entry.name === ".maestro")
-				) {
+				if (ignored.has(entry.name) || (gitFiles && !gitDirectories.has(path))) continue;
+				try {
+					await walk(absolute, gitRules);
+				} catch (cause) {
+					warnings.push(`${path}: ${(cause as Error).message}`);
+				}
+			} else if (entry.isFile() && (!gitFiles || gitFiles.has(path))) {
+				paths.push(path);
+				if (entry.name === "package.json") {
 					try {
-						await walk(absolute);
-					} catch (cause) {
-						const error = cause as NodeJS.ErrnoException;
-						warnings.push(`${path}: ${error.message}`);
+						const value = JSON.parse(await readFile(absolute, "utf8"));
+						if (!isRecord(value)) throw new Error("Invalid manifest");
+						manifests.set(dir, value);
+					} catch {
+						warnings.push(`${path}: invalid package manifest`);
 					}
 				}
-			} else if (gitFiles && !gitFiles.has(path)) continue;
-			else if (entry.name === "package.json") {
-				try {
-					manifests.set(dir, JSON.parse(await readFile(absolute, "utf8")));
-				} catch {
-					warnings.push(`${path}: invalid package manifest`);
-				}
-			} else if (entry.name === "bunfig.toml") bunConfigs.add(dir);
-			else if (testPath.test(path) || /\.ya?ml$/.test(path)) files.push(path);
+			}
 		}
 	}
-	await walk(root);
-	function nearest(
-		path: string,
-		matches: {
-			has(key: string): boolean;
-		},
-	) {
+	await walk(root, []);
+	const pathSet = new Set(paths);
+	function nearest(path: string, has: (dir: string) => boolean): string {
 		let dir = dirname(join(root, path));
 		while (dir !== root) {
-			if (matches.has(dir)) return dir;
+			if (has(dir)) return dir;
 			dir = dirname(dir);
 		}
 		return root;
 	}
 	const libraries = new Set<string>();
 	for (const manifest of manifests.values()) {
-		for (const dep of Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })) {
+		for (const dep of Object.keys({ ...manifest.dependencies, ...manifest.devDependencies }))
 			if (
 				[
 					"vitest",
@@ -291,75 +142,94 @@ export async function scanProject(rootInput: string): Promise<Catalog> {
 				].includes(dep)
 			)
 				libraries.add(dep.includes("bun") ? "bun" : dep);
-		}
-		if (
-			Object.values(manifest.scripts ?? {}).some((script) =>
-				/\bbun test\b/.test(String(script)),
-			)
-		)
-			libraries.add("bun");
-		if (
-			Object.values(manifest.scripts ?? {}).some((script) =>
-				/\bmaestro test\b/.test(String(script)),
-			)
-		)
-			libraries.add("maestro");
 	}
-	const catalog: TestFile[] = [];
-	for (const path of files.sort()) {
-		const absolute = join(root, path);
+	const files: TestFile[] = [];
+	for (const path of paths.sort()) {
 		try {
-			const info = await stat(absolute);
-			if (info.size > 2000000) {
-				if (testPath.test(path)) warnings.push(`${path}: skipped (larger than 2 MB)`);
+			const candidates = adapters.filter((adapter) => adapter.match(path));
+			if (!candidates.length && !testPath.test(path)) continue;
+			const absolute = join(root, path);
+			if ((await stat(absolute)).size > 2000000) {
+				warnings.push(`${path}: skipped (larger than 2 MB)`);
 				continue;
 			}
-			const workspace = nearest(path, manifests);
+			const source = await readFile(absolute, "utf8");
+			const workspace = nearest(path, (dir) => manifests.has(dir));
 			const manifest = manifests.get(workspace);
-			const fallback = Object.values(manifest?.scripts ?? {}).some((script) =>
-				/\bbun test\b/.test(String(script)),
-			)
-				? "bun"
-				: "unknown";
-			const stamp = `${info.mtimeMs}:${info.size}:${fallback}`;
-			let parsed =
-				cache.get(absolute)?.stamp === stamp ? cache.get(absolute)!.value : undefined;
-			if (parsed === undefined) {
-				const source = await readFile(absolute, "utf8");
-				parsed = testPath.test(path)
-					? discoverScript(source, path, fallback)
-					: discoverMaestro(source, path);
-				cache.set(absolute, { stamp, value: parsed });
+			const context = {
+				root,
+				path,
+				source,
+				workspace: posix(relative(root, workspace)) || ".",
+				manifest,
+				nearestConfig: (name: string) =>
+					posix(
+						relative(
+							root,
+							nearest(path, (dir) =>
+								pathSet.has(posix(relative(root, join(dir, name)))),
+							),
+						),
+					) || ".",
+			};
+			let parsed: DiscoveredFile | null = null;
+			let runner = "unknown";
+			for (const adapter of candidates) {
+				parsed = await adapter.discover(context);
+				if (parsed) {
+					runner = adapter.id;
+					break;
+				}
+			}
+			if (!parsed && testPath.test(path)) {
+				const fallback = Object.values(manifest?.scripts ?? {}).some((script) =>
+					/\bbun test\b/.test(String(script)),
+				)
+					? "bun"
+					: "unknown";
+				const detected = discoverScript(source, path, fallback);
+				parsed = detected;
+				runner = detected.runner ?? "unknown";
 			}
 			if (!parsed) continue;
-			if (parsed.runner !== "unknown") libraries.add(parsed.runner!);
-			const cwd = parsed.runner === "maestro" ? workspace : nearest(path, bunConfigs);
-			catalog.push({
+			if (runner !== "unknown") libraries.add(runner);
+			files.push({
+				...parsed,
 				id: path,
 				path,
-				workspace: relative(root, workspace) || ".",
-				cwd: relative(root, cwd) || ".",
-				name: basename(path),
-				runner: "unknown",
-				cases: [],
-				...parsed,
+				workspace: context.workspace,
+				cwd: parsed.cwd ?? context.workspace,
+				name: parsed.name ?? basename(path),
+				cases: parsed.cases ?? [],
+				runner,
 			});
 		} catch (cause) {
-			const error = cause as NodeJS.ErrnoException;
-			warnings.push(`${path}: ${error.message}`);
+			warnings.push(`${path}: ${(cause as Error).message}`);
 		}
 	}
 	return {
 		root,
-		name: manifests.get(root)?.name ?? basename(root),
+		name: config.name ?? manifests.get(root)?.name ?? basename(root),
 		scannedAt: new Date().toISOString(),
-		files: catalog,
+		files,
 		libraries: [...libraries].sort(),
 		warnings,
-		runners: ["bun", "maestro"].map((id) => ({
-			id,
-			available: !!Bun.which(id),
-			path: Bun.which(id),
-		})),
+		runners: adapters.map((adapter) => {
+			const path =
+				executablePath(adapter.executable, root) ??
+				files
+					.filter((file) => file.runner === adapter.id)
+					.map((file) => executablePath(adapter.executable, resolve(root, file.cwd)))
+					.find(Boolean) ??
+				null;
+			return {
+				id: adapter.id,
+				label: adapter.label,
+				executable: adapter.executable,
+				supportsIndividualTests: !!adapter.supportsIndividualTests,
+				available: !!path,
+				path,
+			};
+		}),
 	};
 }

@@ -2,7 +2,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
-import { adapters, displayCommand, parseReport } from "./adapters.ts";
+import { adapters as builtins, displayCommand, executablePath, parseReport } from "./adapters.ts";
+import type { Adapter, Command } from "./adapter.ts";
 import type { Catalog, Run, RunOptions, Selection } from "./types.ts";
 export function validateRequest(value: unknown): { selections: Selection[]; options: RunOptions } {
 	if (
@@ -63,7 +64,10 @@ export class TestRunner {
 	private child?: ChildProcess;
 	private current?: Run;
 	private stopChild?: () => void;
-	constructor(private timeoutMs = 30 * 60000) {}
+	constructor(
+		private timeoutMs = 30 * 60000,
+		private adapters: Adapter[] = builtins,
+	) {}
 	async start(catalog: Catalog, selections: Selection[], options: RunOptions = {}): Promise<Run> {
 		if (this.current)
 			throw new Error("A run is already active. Stop it or wait for it to finish.");
@@ -71,16 +75,33 @@ export class TestRunner {
 			const file = catalog.files.find((file) => file.id === selection.fileId);
 			if (!file)
 				throw new Error("A selected file is no longer in the catalog. Refresh discovery.");
-			if (!adapters.some((adapter) => adapter.id === file.runner))
+			if (!this.adapters.some((adapter) => adapter.id === file.runner))
 				throw new Error(`${file.runner} is detected but has no execution adapter yet.`);
 			if (!catalog.runners.find((runner) => runner.id === file.runner)?.available)
 				throw new Error(
 					`${file.runner} is not on PATH. Install it and restart Test Studio.`,
 				);
 			// Validate the entire request before launching any process.
-			adapters
-				.find((adapter) => adapter.id === file.runner)!
-				.command(catalog.root, file, selection, "/tmp/report.xml", options);
+			const adapter = this.adapters.find((adapter) => adapter.id === file.runner)!;
+			if (
+				selection.caseIds?.length &&
+				(!adapter.supportsIndividualTests ||
+					selection.caseIds.some(
+						(id) => !file.cases.find((item) => item.id === id)?.runnable,
+					))
+			)
+				throw new Error(
+					"Invalid test selection. This adapter or test requires a file-level run.",
+				);
+			validateCommand(
+				adapter.command({
+					root: catalog.root,
+					file,
+					selection,
+					reportPath: join(tmpdir(), "report.xml"),
+					options,
+				}),
+			);
 			return file;
 		});
 		// Reserve synchronously to prevent simultaneous requests launching overlapping runs.
@@ -131,6 +152,7 @@ export class TestRunner {
 			if (cancelled()) break;
 			job.status = "running";
 			job.startedAt = Date.now();
+
 			try {
 				const actual = await realpath(resolve(root, job.file.path));
 				const inside = relative(root, actual);
@@ -142,24 +164,32 @@ export class TestRunner {
 					break;
 				}
 				const report = join(run.artifactDir, `${job.id}.xml`);
-				const command = adapters
-					.find((adapter) => adapter.id === job.file.runner)!
-					.command(root, job.file, job.selection, report, options);
+				const adapter = this.adapters.find((adapter) => adapter.id === job.file.runner)!;
+				const command = adapter.command({
+					root,
+					file: job.file,
+					selection: job.selection,
+					reportPath: report,
+					options,
+				});
+				validateCommand(command);
+				const executable = executablePath(command.executable, command.cwd);
+				if (!executable) throw new Error(`Executable not found: ${command.executable}`);
 				job.command = displayCommand(command);
 				// Never invoke a shell: paths, device IDs, and environment values are literal arguments.
-				const child = spawn(command.executable, command.args, {
+				const child = spawn(executable, command.args, {
 					cwd: command.cwd,
-					env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
+					env: { ...process.env, ...command.env, FORCE_COLOR: "0", NO_COLOR: "1" },
 					stdio: ["ignore", "pipe", "pipe"],
 					detached: process.platform !== "win32",
 				});
 				this.child = child;
 				const append = (chunk: string) => {
 					// eslint-disable-next-line no-control-regex -- Runner output contains ANSI escape sequences.
-					job.output = (job.output + chunk.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")).slice(
-						-100000,
-					);
+					const text = chunk.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
+					job.output = (job.output + text).slice(-100000);
 				};
+
 				child.stdout!.setEncoding("utf8").on("data", append);
 				child.stderr!.setEncoding("utf8").on("data", append);
 				let killTimer: ReturnType<typeof setTimeout> | undefined;
@@ -179,7 +209,7 @@ export class TestRunner {
 				let timedOut = false;
 				const timeout = setTimeout(() => {
 					timedOut = true;
-					append("\nTest Studio: job exceeded its 30-minute limit.\n");
+					append(`\nTest Studio: job exceeded its ${this.timeoutMs} ms limit.\n`);
 					this.stopChild?.();
 				}, this.timeoutMs);
 				// A stop may arrive while realpath is awaiting.
@@ -199,11 +229,32 @@ export class TestRunner {
 					this.stopChild = undefined;
 				}
 				try {
-					job.results = parseReport(await readFile(report, "utf8"));
+					job.results = adapter.parseResults
+						? await adapter.parseResults({
+								file: job.file,
+								reportPath: report,
+								output: job.output,
+								exitCode: job.exitCode ?? null,
+							})
+						: parseReport(await readFile(report, "utf8"));
+					if (
+						!Array.isArray(job.results) ||
+						job.results.some(
+							(result) =>
+								!result ||
+								typeof result.name !== "string" ||
+								!["passed", "failed", "skipped"].includes(result.status) ||
+								!Number.isFinite(result.duration) ||
+								result.duration < 0,
+						)
+					) {
+						job.results = [];
+						throw new Error("Adapter returned invalid results");
+					}
 				} catch (cause) {
 					const error = cause as NodeJS.ErrnoException;
 					append(
-						`\nTest Studio: no readable JUnit report (${error.code ?? error.message}). See process output.\n`,
+						`\nTest Studio: no readable test results (${error.code ?? error.message}). See process output.\n`,
 					);
 				}
 				job.status = cancelled()
@@ -240,4 +291,26 @@ export class TestRunner {
 		run.finishedAt = Date.now();
 		this.current = undefined;
 	}
+}
+
+function validateCommand(command: Command) {
+	if (
+		!command ||
+		typeof command.executable !== "string" ||
+		!command.executable ||
+		command.executable.includes("\0") ||
+		typeof command.cwd !== "string" ||
+		!command.cwd ||
+		!Array.isArray(command.args) ||
+		command.args.some((arg) => typeof arg !== "string" || arg.includes("\0"))
+	)
+		throw new Error("Adapter returned an invalid command.");
+	if (
+		command.env &&
+		Object.entries(command.env).some(
+			([key, value]) =>
+				!key || /[=\0]/.test(key) || typeof value !== "string" || value.includes("\0"),
+		)
+	)
+		throw new Error("Adapter returned an invalid environment.");
 }

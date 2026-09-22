@@ -1,0 +1,76 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"title": "Test Studio configuration",
+	"type": "object",
+	"additionalProperties": false,
+	"properties": {
+		"$schema": {
+			"type": "string"
+		},
+		"name": {
+			"type": "string",
+			"minLength": 1
+		},
+		"port": {
+			"type": "integer",
+			"minimum": 0,
+			"maximum": 65535,
+			"default": 4310
+		},
+		"adapters": {
+			"type": "array",
+			"default": ["bun", "maestro"],
+			"items": {
+				"oneOf": [
+					{
+						"type": "string",
+						"minLength": 1
+					},
+					{
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["use"],
+						"properties": {
+							"use": {
+								"type": "string",
+								"minLength": 1
+							},
+							"options": {
+								"type": "object"
+							}
+						}
+					}
+				]
+			}
+		},
+		"exclude": {
+			"type": "array",
+			"items": {
+				"type": "string"
+			},
+			"default": []
+		},
+		"ignoreFile": {
+			"oneOf": [
+				{
+					"type": "string",
+					"minLength": 1
+				},
+				{
+					"const": false
+				}
+			],
+			"default": ".teststudioignore"
+		},
+		"respectGitignore": {
+			"type": "boolean",
+			"default": true
+		},
+		"timeoutMs": {
+			"type": "integer",
+			"minimum": 1,
+			"maximum": 2147483647,
+			"default": 1800000
+		}
+	}
+}

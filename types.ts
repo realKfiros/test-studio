@@ -32,6 +32,9 @@ export type Catalog = {
 	warnings: string[];
 	runners: {
 		id: string;
+		label: string;
+		executable: string;
+		supportsIndividualTests: boolean;
 		available: boolean;
 		path: string | null;
 	}[];
