@@ -35,6 +35,45 @@ npx --yes --package /tmp/test-studio-0.1.0.tgz test-studio /absolute/path/to/pro
 
 The package does not need Bun to start. Each adapter finds its tool in project-local `node_modules/.bin` directories or on PATH. Missing tools are shown in the UI.
 
+## Run in the terminal
+
+`run` executes tests once without starting the web server and exits when the run finishes. It uses the same project config, ignore files, built-in/custom adapters, timeout, and serial process queue as the UI.
+
+From this checkout:
+
+```sh
+npm start -- run /absolute/path/to/project
+npm start -- run /absolute/path/to/project --runner bun
+npm start -- run /absolute/path/to/project --file packages/api --test "creates a user"
+npm start -- run /absolute/path/to/project --runner maestro --device simulator-id --env MODE=local
+```
+
+With the executable installed (or through npx after publication):
+
+```sh
+test-studio run
+test-studio run --runner bun --file tests/example.test.ts
+test-studio --no-ui --runner bun
+```
+
+`--no-ui` is an alias for `run`. The project defaults to the current directory. `--config` works in both modes; `--port` is only for the UI.
+
+| Option             | Selection                                                                                                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--runner ID`      | Enabled adapter ID; repeat to include multiple adapters.                                                                                                |
+| `--file PATH`      | Exact file or directory inside the project; repeat to include multiple paths. Relative paths resolve from the project root. These are paths, not globs. |
+| `--test TEXT`      | Case-sensitive literal substring of the full static test name, including suite names. Requires an adapter with individual test selection.               |
+| `--device ID`      | Device identifier passed to the adapter.                                                                                                                |
+| `--env NAME=value` | Flow variable; repeat for multiple variables. Values containing spaces or shell punctuation should be quoted.                                           |
+
+Filters combine: a test must match the selected adapters, paths, and name. Name filters never silently broaden into whole-file runs; generated, duplicate, skipped, or otherwise unselectable cases require a file-level run. Maestro steps cannot be selected independently.
+
+Without explicit file/name selection, discovered files without an enabled adapter are reported as `SKIP` and excluded. Explicitly selecting an unsupported file is an error. Missing executables, empty selections, unmatched file paths, and discovery errors fail before tests start. Discovery errors are treated strictly in terminal mode so an incomplete scan cannot produce a successful CI result.
+
+Output streams live, followed by per-file and per-test results, totals, duration, and the report directory. Full streamed output can be redirected to a file; the runner still retains only the latest 100,000 characters per job for adapter result parsing. Reports remain in the printed temporary directory.
+
+Exit codes are `0` for a passing run, `1` for failures/timeouts/setup or selection errors, `130` after Ctrl+C, and `143` after SIGTERM. Cancellation stops the active process group and cancels queued files before exiting.
+
 ## Use
 
 - Filter by runner, workspace, platform, filename, test name, or flow tag. `/` focuses search.
@@ -126,7 +165,7 @@ bun run test
 npm run test:package
 ```
 
-The integration suite launches real processes against temporary projects and a local HTTP server. It covers built-in and custom adapters, config loading, ignore rules, filtering, failures, zero-result runs, cancellation, timeouts, queue exclusivity, report parsing, and the local API boundary. `test:package` packs and installs the npm artifact into a temporary consumer, then checks npx, config initialization, SDK imports, custom adapter execution, and UI assets with only Node and system tools on PATH. It may download dependencies during installation.
+The integration suite launches real processes against temporary projects and a local HTTP server. It covers built-in and custom adapters, config loading, ignore rules, filtering, failures, zero-result runs, cancellation, timeouts, queue exclusivity, report parsing, and the local API boundary. `test:package` packs and installs the npm artifact into a temporary consumer, then checks npx, config initialization, SDK imports, custom adapter execution in both terminal and UI modes, and UI assets with only Node and system tools on PATH. It may download dependencies during installation.
 
 ## Extending
 

@@ -4,7 +4,7 @@ import { join, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { adapters as builtins, displayCommand, executablePath, parseReport } from "./adapters.ts";
 import type { Adapter, Command } from "./adapter.ts";
-import type { Catalog, Run, RunOptions, Selection } from "./types.ts";
+import type { Catalog, Job, Run, RunOptions, Selection } from "./types.ts";
 export function validateRequest(value: unknown): { selections: Selection[]; options: RunOptions } {
 	if (
 		!value ||
@@ -28,7 +28,13 @@ export function validateRequest(value: unknown): { selections: Selection[]; opti
 		)
 			throw new Error("Invalid test selection.");
 	}
-	const options = ("options" in value ? value.options : undefined) ?? {};
+	return {
+		selections: value.selections,
+		options: validateRunOptions("options" in value ? value.options : undefined),
+	};
+}
+export function validateRunOptions(value: unknown): RunOptions {
+	const options = value ?? {};
 	if (typeof options !== "object" || Array.isArray(options))
 		throw new Error("Invalid run options.");
 	const { device, env } = options as Record<string, unknown>;
@@ -51,22 +57,20 @@ export function validateRequest(value: unknown): { selections: Selection[]; opti
 		)
 			throw new Error("Flow environment must use NAME=value entries.");
 	}
-	return {
-		selections: value.selections,
-		options: {
-			device: device as string | undefined,
-			env: env as Record<string, string> | undefined,
-		},
-	};
+	return { device: device as string | undefined, env: env as Record<string, string> | undefined };
 }
+export type RunnerEvent =
+	{ type: "job-started" | "job-finished"; job: Job } | { type: "output"; job: Job; text: string };
 export class TestRunner {
 	runs: Run[] = [];
 	private child?: ChildProcess;
 	private current?: Run;
 	private stopChild?: () => void;
+	private completions = new WeakMap<Run, Promise<void>>();
 	constructor(
 		private timeoutMs = 30 * 60000,
 		private adapters: Adapter[] = builtins,
+		private onEvent?: (event: RunnerEvent) => void,
 	) {}
 	async start(catalog: Catalog, selections: Selection[], options: RunOptions = {}): Promise<Run> {
 		if (this.current)
@@ -119,7 +123,7 @@ export class TestRunner {
 				id: String(index),
 				file,
 				selection: selections[index],
-				status: "queued",
+				status: run.status === "cancelled" ? "cancelled" : "queued",
 				command: "",
 				output: "",
 				results: [],
@@ -128,12 +132,19 @@ export class TestRunner {
 			const stale = this.runs.splice(20);
 			for (const item of stale)
 				void rm(item.artifactDir, { recursive: true, force: true }).catch(() => {});
-			void this.execute(catalog.root, run, options);
+			this.completions.set(run, this.execute(catalog.root, run, options));
 			return run;
 		} catch (error) {
 			this.current = undefined;
 			throw error;
 		}
+	}
+	/** Wait for process cleanup and final reports, without starting another run. */
+	async wait(run: Run): Promise<Run> {
+		const completion = this.completions.get(run);
+		if (!completion) throw new Error("This run does not belong to this runner.");
+		await completion;
+		return run;
 	}
 	stop(id: string) {
 		if (!this.current || this.current.id !== id)
@@ -147,12 +158,18 @@ export class TestRunner {
 	}
 	private async execute(root: string, run: Run, options: RunOptions) {
 		const cancelled = () => run.status === "cancelled";
-		run.status = "running";
+		if (!cancelled()) run.status = "running";
 		for (const job of run.jobs) {
 			if (cancelled()) break;
 			job.status = "running";
 			job.startedAt = Date.now();
-
+			this.onEvent?.({ type: "job-started", job });
+			const append = (chunk: string) => {
+				// eslint-disable-next-line no-control-regex -- Runner output contains ANSI escape sequences.
+				const text = chunk.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
+				job.output = (job.output + text).slice(-100000);
+				this.onEvent?.({ type: "output", job, text });
+			};
 			try {
 				const actual = await realpath(resolve(root, job.file.path));
 				const inside = relative(root, actual);
@@ -161,6 +178,7 @@ export class TestRunner {
 				if (cancelled()) {
 					job.status = "cancelled";
 					job.finishedAt = Date.now();
+					this.onEvent?.({ type: "job-finished", job });
 					break;
 				}
 				const report = join(run.artifactDir, `${job.id}.xml`);
@@ -184,11 +202,6 @@ export class TestRunner {
 					detached: process.platform !== "win32",
 				});
 				this.child = child;
-				const append = (chunk: string) => {
-					// eslint-disable-next-line no-control-regex -- Runner output contains ANSI escape sequences.
-					const text = chunk.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
-					job.output = (job.output + text).slice(-100000);
-				};
 
 				child.stdout!.setEncoding("utf8").on("data", append);
 				child.stderr!.setEncoding("utf8").on("data", append);
@@ -281,10 +294,11 @@ export class TestRunner {
 				}
 			} catch (cause) {
 				const error = cause as NodeJS.ErrnoException;
-				job.output += `\n${error.message}\n`;
+				append(`\n${error.message}\n`);
 				job.status = cancelled() ? "cancelled" : "failed";
 			}
 			job.finishedAt = Date.now();
+			this.onEvent?.({ type: "job-finished", job });
 		}
 		if (!cancelled())
 			run.status = run.jobs.some((job) => job.status === "failed") ? "failed" : "passed";

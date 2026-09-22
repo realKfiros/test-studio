@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn, execFileSync } from "node:child_process";
+import { spawn, spawnSync, execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile, symlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -120,6 +120,39 @@ void adapter; void config;`,
 	const bin = join(temp, "bin");
 	await mkdir(bin);
 	await symlink(process.execPath, join(bin, process.platform === "win32" ? "node.exe" : "node"));
+	for (const args of [
+		["run", "--runner", "node-checks", "--file", "example.check.mjs"],
+		["--no-ui"],
+	]) {
+		const result = spawnSync(process.execPath, [npx, "--no-install", "test-studio", ...args], {
+			cwd: consumer,
+			env: { ...process.env, PATH: `${bin}:/usr/bin:/bin` },
+			encoding: "utf8",
+			timeout: 15000,
+		});
+		for (const match of result.stdout.matchAll(/^Reports: (.+)$/gm)) artifacts.add(match[1]);
+		assert.equal(result.status, 0, result.stderr + result.stdout);
+		assert(result.stdout.includes("PASSED example.check.mjs"));
+		assert(!result.stdout.includes("http://"));
+	}
+	await writeFile(
+		join(consumer, "failure.check.mjs"),
+		"import {test} from 'node:test'; test('packed failure', () => { throw new Error('expected failure'); });",
+	);
+	const failure = spawnSync(
+		process.execPath,
+		[npx, "--no-install", "test-studio", "run", "--file", "failure.check.mjs"],
+		{
+			cwd: consumer,
+			env: { ...process.env, PATH: `${bin}:/usr/bin:/bin` },
+			encoding: "utf8",
+			timeout: 15000,
+		},
+	);
+	for (const match of failure.stdout.matchAll(/^Reports: (.+)$/gm)) artifacts.add(match[1]);
+	assert.equal(failure.status, 1, failure.stderr + failure.stdout);
+	assert(failure.stdout.includes("FAILED failure.check.mjs"));
+	await rm(join(consumer, "failure.check.mjs"));
 	child = spawn(process.execPath, [npx, "--no-install", "test-studio"], {
 		cwd: consumer,
 		env: { ...process.env, PATH: `${bin}:/usr/bin:/bin` },
@@ -177,7 +210,7 @@ void adapter; void config;`,
 	);
 	assert.equal(await new Promise((resolve) => invalid.once("exit", resolve)), 1);
 	console.log(
-		"Package smoke test passed: npx, init, typed config, SDK exports, plugin execution, ignore rules, and UI assets on Node without Bun.",
+		"Package smoke test passed: npx, init, typed config, SDK exports, terminal exit codes, plugin execution, ignore rules, and UI assets on Node without Bun.",
 	);
 } finally {
 	if (child && child.exitCode === null) {
