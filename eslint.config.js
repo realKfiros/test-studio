@@ -17,7 +17,7 @@ export default tseslint.config(
 	js.configs.recommended,
 	...tseslint.configs.recommended,
 	{
-		files: ["**/*.{ts,tsx,js,jsx}"],
+		files: ["**/*.{ts,tsx,js,jsx,mjs,cjs}"],
 		languageOptions: {
 			globals: {
 				...globals.browser,
@@ -29,7 +29,7 @@ export default tseslint.config(
 		},
 	},
 	{
-		files: ["**/*.{ts,tsx}"],
+		files: ["**/*.{ts,tsx}", "scripts/*.mjs", "examples/*.mjs"],
 		languageOptions: {
 			globals: {
 				Bun: "readonly",

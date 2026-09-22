@@ -2,24 +2,38 @@
 
 A local test explorer with pluggable adapters. It discovers files and test declarations directly from source, so adding a test does not require another package.json script. Bun tests and Maestro flows are supported out of the box.
 
-Run this checkout with **Bun 1.3+**. Install Maestro for Maestro flows. Target projects need their own dependencies installed.
+The executable runs on **Node.js 22+**. Bun is only needed to run Bun tests or the development test suite; Maestro is only needed for Maestro flows. Target projects need their own dependencies installed.
 
 ## Start from this checkout
 
 ```sh
 bun install
-bun run start /absolute/path/to/project
+npm run build
+npm start -- /absolute/path/to/project
 ```
 
-Run `bun run start .` to explore this repository. With no path argument, Test Studio scans the current directory. Open the printed local URL; Ctrl+C stops the server and active test process.
+Run `npm start -- .` to explore this repository, or `bun run dev /absolute/path/to/project` to run the TypeScript source during development. With no path argument, Test Studio scans the current directory. Open the printed local URL; Ctrl+C stops the server and active test process.
 
 ```sh
-bun run start /absolute/path/to/project --port 4311
-bun run start /absolute/path/to/project --config config/studio.json
-bun run start init /absolute/path/to/project
+npm start -- /absolute/path/to/project --port 4311
+npm start -- /absolute/path/to/project --config config/studio.json
+npm start -- init /absolute/path/to/project
 ```
 
 `init` creates `test-studio.config.json` and `.teststudioignore`, preserving existing files. It never modifies package.json.
+
+## Executable package
+
+The npm package includes a `test-studio` executable, compiled JavaScript, TypeScript declarations, the UI, and a configuration schema. Once published under an available package name, it can be launched with `npx <package-name> [project-path]`, `bunx <package-name>`, or a locally installed `test-studio` command. The final registry name and license are still to be chosen; this repository remains private and unpublished.
+
+Try the actual package locally without publishing:
+
+```sh
+npm pack --pack-destination /tmp
+npx --yes --package /tmp/test-studio-0.1.0.tgz test-studio /absolute/path/to/project
+```
+
+The package does not need Bun to start. Each adapter finds its tool in project-local `node_modules/.bin` directories or on PATH. Missing tools are shown in the UI.
 
 ## Use
 
@@ -60,11 +74,11 @@ Place one `test-studio.config.json`, `.ts`, `.mts`, `.cts`, `.js`, `.mjs`, or `.
 }
 ```
 
-All options are optional. The default adapters are `["bun", "maestro"]`; supplying `adapters` replaces that list, and an empty list disables execution adapters. Use a module path or an installed package name for an external adapter. Factory exports receive options from entries such as `{ "use": "test-studio-adapter-example", "options": { "project": "web" } }`. Modules are resolved from the config directory, including plugins installed in the target project.
+All options are optional. The default adapters are `["bun", "maestro"]`; supplying `adapters` replaces that list, and an empty list disables execution adapters. Use a module path or an installed package name for an external adapter. Factory exports receive options from entries such as `{ "use": "test-studio-adapter-example", "options": { "project": "web" } }`. Modules are resolved from the config directory, so plugins installed in the target project work when the CLI is launched with npx.
 
 `--port` overrides config; port `0` picks a free port. Restart Test Studio after changing configuration or adapter code. The ignore file is reread on each scan. A custom `ignoreFile` path is relative to the project root and must exist; `false` disables it. `name` overrides the project name in the UI, and `timeoutMs` sets each job's time limit.
 
-Configs export plain objects. The [JSON schema](schema.json) documents every configuration option.
+The published SDK exports `defineConfig`, `defineAdapter`, and their types for editor assistance. Configs can also export plain objects without importing Test Studio. The [JSON schema](schema.json) can be referenced locally as `./node_modules/test-studio/schema.json` when the package is installed.
 
 ## Ignore rules
 
@@ -109,16 +123,17 @@ bun run format:check
 bun run lint
 bun run typecheck
 bun run test
+npm run test:package
 ```
 
-The integration suite launches real processes against temporary projects and a local HTTP server. It covers built-in and custom adapters, config loading, ignore rules, filtering, failures, zero-result runs, cancellation, timeouts, queue exclusivity, report parsing, and the local API boundary.
+The integration suite launches real processes against temporary projects and a local HTTP server. It covers built-in and custom adapters, config loading, ignore rules, filtering, failures, zero-result runs, cancellation, timeouts, queue exclusivity, report parsing, and the local API boundary. `test:package` packs and installs the npm artifact into a temporary consumer, then checks npx, config initialization, SDK imports, custom adapter execution, and UI assets with only Node and system tools on PATH. It may download dependencies during installation.
 
 ## Extending
 
-The [adapter interface](adapter.ts) defines discovery, command construction, and optional result parsing. Export an adapter object or factory from a local module and register it in your project config. Runner metadata automatically supplies its UI controls.
+See [Writing adapters](docs/adapters.md) and the runnable [Node checks example](examples/node-checks.mjs). New frameworks plug into the same discovery, execution, results, and UI interfaces used by the built-ins. You do not need to edit the server, queue, or frontend to register another adapter.
 
 The CLI loads project config and adapters; discovery walks the project once and asks adapters to inspect candidate files. The runner owns process lifecycle, cancellation, timeouts, and history. Adapters supply literal commands and normalized results, with JUnit as the default report format. The UI is plain HTML/CSS/JS and reads runner metadata from the catalog.
 
-Before release: add executable packaging, choose a registry name and license, add CI, and verify Windows process cancellation. This checkout remains private and unpublished.
+Before release: choose a registry name and license, add CI, and verify Windows process cancellation and executable shims. Nothing is published automatically.
 
-Runner references: [Bun reporting](https://bun.sh/docs/test/reporters), [Bun test filtering](https://bun.sh/docs/test), [Maestro CLI options](https://docs.maestro.dev/maestro-cli/maestro-cli-commands-and-options). Configuration modules use [jiti](https://github.com/unjs/jiti) and ignore files use [node-ignore](https://github.com/kaelzhang/node-ignore).
+Runner references: [Bun reporting](https://bun.sh/docs/test/reporters), [Bun test filtering](https://bun.sh/docs/test), [Maestro CLI options](https://docs.maestro.dev/maestro-cli/maestro-cli-commands-and-options). Packaging follows npm's [executable and files configuration](https://docs.npmjs.com/cli/v8/configuring-npm/package-json/); configuration modules use [jiti](https://github.com/unjs/jiti) and ignore files use [node-ignore](https://github.com/kaelzhang/node-ignore).
