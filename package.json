@@ -1,6 +1,6 @@
 {
 	"name": "@kfiros/test-studio",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"type": "module",
 	"scripts": {
 		"start": "node dist/cli.js",
