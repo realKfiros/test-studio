@@ -12,7 +12,11 @@ execFileSync(
 	],
 	{ cwd: root, stdio: "inherit" },
 );
-await cp(new URL("../web/", import.meta.url), new URL("../dist/web/", import.meta.url), {
+execFileSync(process.execPath, [fileURLToPath(new URL("./build-ui.mjs", import.meta.url))], {
+	cwd: root,
+	stdio: "inherit",
+});
+await cp(new URL("../ui/dist/", import.meta.url), new URL("../dist/web/", import.meta.url), {
 	recursive: true,
 });
 await chmod(new URL("../dist/cli.js", import.meta.url), 0o755);

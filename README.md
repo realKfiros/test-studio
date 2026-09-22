@@ -22,6 +22,16 @@ npm start -- init /absolute/path/to/project
 
 `init` creates `test-studio.config.json` and `.teststudioignore`, preserving existing files. It never modifies package.json.
 
+## UI development
+
+The Expo web app lives in `ui/`: `App.tsx` composes the screen, `components/` contains the catalog and inspectors, `useStudio.ts` owns API polling and actions, and `theme.ts` defines the shared theme. Screens and controls use React Native primitives with `styled-components/native`. Each component declares its private styles above its function; styles shared between components live in `ui/styles/`. Browser-only integration (the session token, page title, and keyboard shortcut) lives in `.web.ts` modules.
+
+`npm run build` compiles the Node executable and runs Expo's web export, copying the resulting HTML and hashed assets into `dist/web/`. Expo, React, React Native Web, and styled-components are build dependencies; the installed executable only serves those static files and its local API. No Metro server, Expo runtime service, or frontend build runs on the user's machine.
+
+During development, `bun run dev /absolute/path/to/project` exports the UI and starts the TypeScript server. After editing the UI, restart that command and reload the page. `npm run build:ui` exports only the frontend; `npm run typecheck` checks both the executable and UI. API requests remain on the executable's origin with its session token.
+
+The build follows [Expo's web export workflow](https://docs.expo.dev/guides/publishing-websites/), using the single-page output target.
+
 ## Executable package
 
 The npm package includes a `test-studio` executable, compiled JavaScript, TypeScript declarations, the UI, and a configuration schema. Once published under an available package name, it can be launched with `npx <package-name> [project-path]`, `bunx <package-name>`, or a locally installed `test-studio` command. The final registry name and license are still to be chosen; this repository remains private and unpublished.
@@ -171,7 +181,7 @@ The integration suite launches real processes against temporary projects and a l
 
 See [Writing adapters](docs/adapters.md) and the runnable [Node checks example](examples/node-checks.mjs). New frameworks plug into the same discovery, execution, results, and UI interfaces used by the built-ins. You do not need to edit the server, queue, or frontend to register another adapter.
 
-The CLI loads project config and adapters; discovery walks the project once and asks adapters to inspect candidate files. The runner owns process lifecycle, cancellation, timeouts, and history. Adapters supply literal commands and normalized results, with JUnit as the default report format. The UI is plain HTML/CSS/JS and reads runner metadata from the catalog.
+The CLI loads project config and adapters; discovery walks the project once and asks adapters to inspect candidate files. The runner owns process lifecycle, cancellation, timeouts, and history. Adapters supply literal commands and normalized results, with JUnit as the default report format. The UI is an Expo web app built with TypeScript, React, and styled-components. It reads runner metadata from the same catalog API.
 
 Before release: choose a registry name and license, add CI, and verify Windows process cancellation and executable shims. Nothing is published automatically.
 

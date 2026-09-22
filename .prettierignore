@@ -8,3 +8,4 @@ playwright-report/
 bun.lock
 .env
 .env.*
+.expo/

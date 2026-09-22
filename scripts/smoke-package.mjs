@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { spawn, spawnSync, execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile, symlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -33,15 +34,16 @@ try {
 		run(["pack", "--ignore-scripts", "--json", "--pack-destination", temp]),
 	)[0];
 	const names = packed.files.map((file) => file.path);
-	for (const file of [
-		"dist/cli.js",
-		"dist/index.d.ts",
-		"dist/web/index.html",
-		"dist/web/app.js",
-		"dist/web/style.css",
-		"schema.json",
-	])
+	for (const file of ["dist/cli.js", "dist/index.d.ts", "dist/web/index.html", "schema.json"])
 		assert(names.includes(file), `Package is missing ${file}`);
+	assert(
+		names.some((name) => name.startsWith("dist/web/_expo/") && name.endsWith(".js")),
+		"Expo bundle missing",
+	);
+	assert(
+		!names.some((name) => name.startsWith("ui/") || name.startsWith("web/")),
+		"UI source must not be published",
+	);
 	assert(!names.some((name) => name.startsWith("tests/") || name.endsWith(".test.ts")));
 	const consumer = join(temp, "consumer");
 	await mkdir(consumer);
@@ -57,6 +59,11 @@ try {
 		],
 		consumer,
 	);
+	for (const dependency of ["expo", "react", "react-dom", "react-native", "styled-components"])
+		assert(
+			!existsSync(join(consumer, "node_modules", dependency)),
+			`${dependency} must only be a build dependency`,
+		);
 	await writeFile(
 		join(consumer, "sdk-check.ts"),
 		`import { defineAdapter, defineConfig, type Adapter } from 'test-studio';
@@ -193,8 +200,15 @@ void adapter; void config;`,
 		["example.check.mjs"],
 	);
 	assert.equal(catalog.runners[0].available, true);
-	for (const path of ["/app.js", "/style.css"])
-		assert.equal((await fetch(base + path)).status, 200);
+	const scripts = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map((match) => match[1]);
+	assert(scripts.length, "Exported HTML must load a compiled bundle");
+	for (const path of scripts) {
+		const response = await fetch(new URL(path, base));
+		assert.equal(response.status, 200);
+		assert(response.headers.get("content-type").includes("javascript"));
+		assert((await response.text()).length > 1000);
+	}
+	assert.equal((await fetch(base + "/ui/App.tsx")).status, 404);
 	const { id } = await api("/api/run", { selections: [{ fileId: "example.check.mjs" }] });
 	const completed = await waitUntil(async () => {
 		const run = await api(`/api/runs/${id}`);

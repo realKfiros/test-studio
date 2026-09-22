@@ -18,7 +18,10 @@ const contentTypes: Record<string, string> = {
 
 /** Only exported files are addressable; request paths are never resolved on disk. */
 export async function loadWebAssets(token: string) {
-	const root = new URL("./web/", import.meta.url);
+	const root = new URL(
+		import.meta.url.endsWith(".ts") ? "./ui/dist/" : "./web/",
+		import.meta.url,
+	);
 	const files = new Map<string, URL>();
 	async function visit(directory: URL, prefix: string) {
 		for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -51,8 +54,10 @@ export async function loadWebAssets(token: string) {
 				headers: {
 					"Content-Type": "text/html; charset=utf-8",
 					"Cache-Control": "no-store",
+					// React Native Web and styled-components generate style elements and inline styles.
+					// Scripts remain restricted to files served by this origin.
 					"Content-Security-Policy":
-						"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+						"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
 					"X-Content-Type-Options": "nosniff",
 				},
 			});
