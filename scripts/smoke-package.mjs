@@ -59,7 +59,15 @@ try {
 		],
 		consumer,
 	);
-	for (const dependency of ["expo", "react", "react-dom", "react-native", "styled-components"])
+	for (const dependency of [
+		"expo",
+		"react",
+		"react-dom",
+		"react-native",
+		"styled-components",
+		"mobx",
+		"mobx-react-lite",
+	])
 		assert(
 			!existsSync(join(consumer, "node_modules", dependency)),
 			`${dependency} must only be a build dependency`,
