@@ -60,7 +60,8 @@
 		"dist/",
 		"schema.json",
 		"docs/",
-		"examples/"
+		"examples/",
+		"development.md"
 	],
 	"exports": {
 		".": {

@@ -1,12 +1,18 @@
 # Test Studio
 
-A local test explorer with pluggable adapters. It discovers files and test declarations directly from source, so adding a test does not require another package.json script. Bun tests and Maestro flows are supported out of the box.
+[![npm version](https://img.shields.io/npm/v/%40kfiros%2Ftest-studio?color=9eb6d8)](https://www.npmjs.com/package/@kfiros/test-studio)
+[![MIT license](https://img.shields.io/badge/license-MIT-97c3a2)](LICENSE)
+[![Node.js 22+](https://img.shields.io/badge/node-%E2%89%A522-97c3a2)](https://nodejs.org/)
 
-The executable runs on **Node.js 22+**. Bun is only needed to run Bun tests or the development test suite; Maestro is only needed for Maestro flows. Target projects need their own dependencies installed.
+Discover and run your tests from a local browser UI or the terminal. Test Studio finds test files and declarations automatically, with built-in support for **Bun tests**, **Maestro flows**, and **custom adapters**.
+
+![Test explorer showing Bun suites and Maestro flows in a sample workspace](docs/images/explorer.png)
+
+[Quick start](#quick-start) · [Adapters](#extend-with-adapters) · [Browser UI](#use-the-browser-ui) · [Terminal](#run-from-the-terminal) · [Configuration](#configure-your-project) · [Contributing](development.md)
 
 ## Quick start
 
-Run from the project you want to explore:
+From the project you want to test:
 
 ```sh
 npx @kfiros/test-studio
@@ -14,208 +20,154 @@ npx @kfiros/test-studio
 bunx @kfiros/test-studio
 ```
 
-Pass a path to explore another project, or use `run` for terminal-only execution:
+Open the printed local URL. Test Studio scans the current directory; pass a path to explore another project:
 
 ```sh
-npx @kfiros/test-studio /absolute/path/to/project
-bunx @kfiros/test-studio run --runner bun
+npx @kfiros/test-studio /path/to/project
+npx @kfiros/test-studio /path/to/project --port 4311
+```
+
+You need **Node.js 22+** with either launcher. Install your project's dependencies and the tools for the tests you want to run: Bun for Bun tests, Maestro for mobile flows. The UI comes compiled in the package, so no frontend setup is needed. Ctrl+C stops the server and active test process.
+
+Prefer a project dependency? Run `npm install --save-dev @kfiros/test-studio` or `bun add --dev @kfiros/test-studio`. The installed command is `test-studio`.
+
+## What you can do
+
+- Browse tests across packages in a monorepo, with filters for runner, workspace, platform, test name, and tags.
+- Run a file, selected files, or individual statically named Bun tests.
+- Inspect Maestro flow steps and source, and pass a device ID or flow variables.
+- Follow live output and per-test results, stop a run, or rerun failed files.
+- Run the same selections from the terminal with exit codes for scripts and CI.
+- Add another test framework through an adapter in your project or an installed package.
+
+## Extend with adapters
+
+Bun and Maestro work out of the box. Adapters let other tools use the same discovery, execution, and results UI.
+
+| Adapter          | Discovers                                     | Runs                                                |
+| ---------------- | --------------------------------------------- | --------------------------------------------------- |
+| **Bun**          | JS/TS test files and static test declarations | Whole files or individual tests                     |
+| **Maestro**      | YAML flows, steps, tags, and platform hints   | Complete flows                                      |
+| **Your adapter** | Any file format you choose                    | A command that produces normalized results or JUnit |
+
+Register a local adapter alongside the built-ins:
+
+```json
+{
+	"adapters": ["bun", "maestro", "./tools/node-checks.mjs"]
+}
+```
+
+Save this as `test-studio.config.json` and copy the included [Node checks adapter](examples/node-checks.mjs) to `tools/node-checks.mjs`. It runs files named `*.check.mjs` with Node's test runner:
+
+```js
+// example.check.mjs
+import { test } from "node:test";
+import assert from "node:assert/strict";
+
+test("adds numbers", () => {
+	assert.equal(1 + 1, 2);
+});
+```
+
+```sh
+npx @kfiros/test-studio run --runner node-checks
+```
+
+Adapters can also be installed npm packages. Install them in the project being tested, then add their package names to `adapters`. Supplying `adapters` replaces the default list, so include `bun` and `maestro` if you still want them.
+
+See **[Writing adapters](docs/adapters.md)** for the interface, factory options, TypeScript helpers, and result parsing. Other recognized frameworks, such as Vitest, Jest, and Playwright, are inspectable but need an adapter to run.
+
+## Use the browser UI
+
+1. Filter the catalog by runner or workspace. Press `/` to search filenames, test names, or tags.
+2. Open a file to inspect its tests, flow steps, or source.
+3. Select file checkboxes or individual Bun tests, then choose **Run selected**. Use **Run file**, **Run flow**, or a test's play button for an immediate run.
+4. Watch output and results. **Stop** cancels the active run; **Rerun failed** retries failed files with their original selections.
+
+![A completed Bun run with live output, per-test results, and report location](docs/images/run-results.png)
+
+_Screenshots use a sample project; the test catalog and results come from the running application._
+
+**History** and the sidebar show recent runs for the current server session. Discovery refreshes every five seconds as files change. Each file runs in a fresh process, one at a time.
+
+For Maestro, open **Run settings** to choose a device ID and supply `NAME=value` variables. Start your simulator or device and make sure the target app is ready first. Platform filters narrow the catalog; they do not choose the device.
+
+## Run from the terminal
+
+Add `run` to execute once without the UI:
+
+```sh
+# Run all tests with enabled adapters
+npx @kfiros/test-studio run
+
+# Run only Bun tests in a package
+bunx @kfiros/test-studio run --runner bun --file packages/api
+
+# Select a test by its full name, including its suite name
+npx @kfiros/test-studio run --file tests/session.test.ts --test "Session creates a session"
+
+# Run Maestro with a device and flow variables
+npx @kfiros/test-studio run --runner maestro --device simulator-id --env APP_ID=com.example.app
+```
+
+`--no-ui` is an alias for `run`. Add a project path after `run` to target another directory. `--runner` and `--file` can be repeated; all filters combine. `--test` is a case-sensitive literal substring, and `--file` takes a file or directory path, not a glob.
+
+Output streams to the terminal and ends with results and a report directory. Exit codes are **0** for passing, **1** for failed tests or setup/selection errors, **130** for Ctrl+C, and **143** for SIGTERM. Empty selections and missing tools fail before execution.
+
+See the [CLI reference](docs/reference.md#terminal-options-and-exit-codes) for complete selection behavior and options.
+
+## Configure your project
+
+Start with defaults, or generate a config and ignore file:
+
+```sh
 npx @kfiros/test-studio init
 ```
 
-Both launchers use the package's Node executable, so Node.js 22+ must be installed. No global installation or frontend build is needed. To keep the executable in a project:
-
-```sh
-npm install --save-dev @kfiros/test-studio
-# or
-bun add --dev @kfiros/test-studio
-```
-
-The installed command is `test-studio`; the SDK is imported from `@kfiros/test-studio`.
-
-## Start from this checkout
-
-```sh
-bun install
-npm run build
-npm start -- /absolute/path/to/project
-```
-
-Run `npm start -- .` to explore this repository, or `bun run dev /absolute/path/to/project` to run the TypeScript source during development. With no path argument, Test Studio scans the current directory. Open the printed local URL; Ctrl+C stops the server and active test process.
-
-```sh
-npm start -- /absolute/path/to/project --port 4311
-npm start -- /absolute/path/to/project --config config/studio.json
-npm start -- init /absolute/path/to/project
-```
-
-`init` creates `test-studio.config.json` and `.teststudioignore`, preserving existing files. It never modifies package.json.
-
-## UI development
-
-The Expo web app lives in `ui/`: `App.tsx` composes the screen, `components/` contains the catalog and inspectors, `stores/studioStore.ts` owns observable state, computed values, API polling, and actions, and `theme.ts` defines the shared theme. Screens read the shared MobX store through `observer` components. The app connects the store on mount and disconnects it on unmount, disposing timers, reactions, and requests. Screens and controls use React Native primitives with `styled-components/native`. Each component declares its private styles above its function; styles shared between components live in `ui/styles/`. Browser-only integration (the session token, page title, and keyboard shortcut) lives in `.web.ts` modules.
-
-`npm run build` compiles the Node executable and runs Expo's web export, copying the resulting HTML and hashed assets into `dist/web/`. Expo, React, React Native Web, MobX, and styled-components are build dependencies; the installed executable only serves those static files and its local API. No Metro server, Expo runtime service, or frontend build runs on the user's machine.
-
-During development, `bun run dev /absolute/path/to/project` exports the UI and starts the TypeScript server. After editing the UI, restart that command and reload the page. `npm run build:ui` exports only the frontend; `npm run typecheck` checks both the executable and UI. API requests remain on the executable's origin with its session token.
-
-The build follows [Expo's web export workflow](https://docs.expo.dev/guides/publishing-websites/), using the single-page output target.
-
-## Executable package
-
-The `@kfiros/test-studio` npm package includes a `test-studio` executable, compiled JavaScript, TypeScript declarations, the UI, and a configuration schema. The UI is already compiled in the package; launching it never starts Expo or Metro.
-
-Try the actual package locally without publishing:
-
-```sh
-npm pack --pack-destination /tmp
-npx --yes --package /tmp/kfiros-test-studio-0.1.0.tgz test-studio /absolute/path/to/project
-bunx --package /tmp/kfiros-test-studio-0.1.0.tgz test-studio /absolute/path/to/project
-```
-
-The package does not need Bun to start. Each adapter finds its tool in project-local `node_modules/.bin` directories or on PATH. Missing tools are shown in the UI.
-
-## Run in the terminal
-
-`run` executes tests once without starting the web server and exits when the run finishes. It uses the same project config, ignore files, built-in/custom adapters, timeout, and serial process queue as the UI.
-
-From this checkout:
-
-```sh
-npm start -- run /absolute/path/to/project
-npm start -- run /absolute/path/to/project --runner bun
-npm start -- run /absolute/path/to/project --file packages/api --test "creates a user"
-npm start -- run /absolute/path/to/project --runner maestro --device simulator-id --env MODE=local
-```
-
-With the executable installed:
-
-```sh
-test-studio run
-test-studio run --runner bun --file tests/example.test.ts
-test-studio --no-ui --runner bun
-```
-
-`--no-ui` is an alias for `run`. The project defaults to the current directory. `--config` works in both modes; `--port` is only for the UI.
-
-| Option             | Selection                                                                                                                                               |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--runner ID`      | Enabled adapter ID; repeat to include multiple adapters.                                                                                                |
-| `--file PATH`      | Exact file or directory inside the project; repeat to include multiple paths. Relative paths resolve from the project root. These are paths, not globs. |
-| `--test TEXT`      | Case-sensitive literal substring of the full static test name, including suite names. Requires an adapter with individual test selection.               |
-| `--device ID`      | Device identifier passed to the adapter.                                                                                                                |
-| `--env NAME=value` | Flow variable; repeat for multiple variables. Values containing spaces or shell punctuation should be quoted.                                           |
-
-Filters combine: a test must match the selected adapters, paths, and name. Name filters never silently broaden into whole-file runs; generated, duplicate, skipped, or otherwise unselectable cases require a file-level run. Maestro steps cannot be selected independently.
-
-Without explicit file/name selection, discovered files without an enabled adapter are reported as `SKIP` and excluded. Explicitly selecting an unsupported file is an error. Missing executables, empty selections, unmatched file paths, and discovery errors fail before tests start. Discovery errors are treated strictly in terminal mode so an incomplete scan cannot produce a successful CI result.
-
-Output streams live, followed by per-file and per-test results, totals, duration, and the report directory. Full streamed output can be redirected to a file; the runner still retains only the latest 100,000 characters per job for adapter result parsing. Reports remain in the printed temporary directory.
-
-Exit codes are `0` for a passing run, `1` for failures/timeouts/setup or selection errors, `130` after Ctrl+C, and `143` after SIGTERM. Cancellation stops the active process group and cancels queued files before exiting.
-
-## Use
-
-- Filter by runner, workspace, platform, filename, test name, or flow tag. `/` focuses search.
-- Select files with their checkboxes, or select individual Bun tests in the inspector. `Run selected` queues the selection. The number on the button counts files, including partially selected files.
-- Use the play button beside an individually selectable test to run it immediately. `Run file` runs the entire file. Hooks still run as usual.
-- Inspect Maestro steps and source, then `Run flow`. Maestro steps are sequential and cannot be run independently.
-- Open `Run settings` to supply a device ID or Maestro `NAME=value` variables. iOS/Android filters narrow the catalog; the device ID chooses the actual device.
-- Inspect live stdout/stderr, per-test results, elapsed time, and exit codes. Stop cancels the active process group and queued files. `Rerun failed` reruns failed files with their original test selections.
-- `Runs` and the sidebar show the last 20 runs in the current server session. Reruns use the current device/variable settings. Settings are not saved across page reloads.
-
-Discovery refreshes every five seconds, including additions, edits, and deletions. Built-in discovery never imports test files; custom adapters should follow the same rule. Tests execute only when you start a run. Execution is serial with a fresh process per file, keeping module mocks isolated across files. Output is polled while running; structured JUnit results arrive when each file finishes.
-
-## Discovery rules
-
-- Test files: `.test`, `.spec`, `_test`, `_spec` with JS/TS module extensions, plus JS/TS files in `__tests__` directories.
-- Bun: explicit `bun:test` imports (including named aliases and namespace imports), or a Bun test script in the nearest package manifest for global-style tests.
-- Vitest, Jest, Node test, and Playwright imports are identified, and relevant package dependencies are listed. Bun and Maestro have built-in execution adapters. Other runners are shown without run controls unless a matching custom adapter is enabled.
-- Maestro: YAML with an `appId` configuration document followed by a command sequence, including files inside `.maestro`. Names, tags, source lines, top-level steps, and filename-based iOS/Android hints are discovered.
-- Static nested suite names are combined into anchored, escaped Bun name filters. Parameterized tests, computed names, declarations inside helper callbacks/loops, and duplicate names are inspectable but require file-level runs. Runtime-generated test counts may differ from declaration counts.
-- Existing `bunfig.toml` is respected by running from the nearest config directory, otherwise from the scan root. Maestro runs from the nearest package directory. Arbitrary package.json shell scripts are never executed. Script-only setup/preload flags need to live in native runner configuration or the environment.
-- In Git repositories, tracked and untracked non-ignored files are scanned. Generated files excluded by `.gitignore` are skipped. Outside Git, filesystem discovery is used.
-- Dependencies, build outputs, coverage, generated native folders (`Pods`, `DerivedData`), editor metadata, symlinks, and nested Git checkouts are skipped. Candidate files larger than 2 MB are skipped.
-
-## Configuration
-
-Place one `test-studio.config.json`, `.ts`, `.mts`, `.cts`, `.js`, `.mjs`, or `.cjs` file at the project root. JavaScript/TypeScript files export a configuration object; CommonJS can use `module.exports`. Multiple config files require an explicit `--config` selection. That path is relative to the project root. Invalid options stop startup with an actionable error.
+This creates `test-studio.config.json` and `.teststudioignore`, keeping existing files intact. It does not modify package.json.
 
 ```json
 {
 	"name": "My project",
 	"port": 4310,
-	"adapters": ["bun", "maestro", "./tools/custom-adapter.mjs"],
+	"adapters": ["bun", "maestro"],
 	"exclude": ["fixtures/generated/"],
-	"ignoreFile": ".teststudioignore",
 	"respectGitignore": true,
 	"timeoutMs": 1800000
 }
 ```
 
-All options are optional. The default adapters are `["bun", "maestro"]`; supplying `adapters` replaces that list, and an empty list disables execution adapters. Use a module path or an installed package name for an external adapter. Factory exports receive options from entries such as `{ "use": "test-studio-adapter-example", "options": { "project": "web" } }`. Modules are resolved from the config directory, so plugins installed in the target project work when the CLI is launched with npx.
+Every option is optional. Config files also support TypeScript, ESM, and CommonJS. Use `--config path/to/config.ts` to select one explicitly; the path is relative to the project root. Restart Test Studio after changing config or adapter code.
 
-`--port` overrides config; port `0` picks a free port. Restart Test Studio after changing configuration or adapter code. The ignore file is reread on each scan. A custom `ignoreFile` path is relative to the project root and must exist; `false` disables it. `name` overrides the project name in the UI, and `timeoutMs` sets each job's time limit.
-
-The SDK exports `defineConfig`, `defineAdapter`, and their types from `@kfiros/test-studio` for editor assistance. Configs can also export plain objects without importing Test Studio. The [JSON schema](schema.json) can be referenced locally as `./node_modules/@kfiros/test-studio/schema.json` when the package is installed.
-
-## Ignore rules
-
-`.teststudioignore` and `exclude` use Git ignore syntax: comments, directory patterns, leading `/` for root anchoring, `**`, and `!` exceptions. Patterns are relative to the project root. Config exclusions are applied first, followed by ignore-file rules.
+Add project-specific exclusions to `.teststudioignore` using Git ignore syntax:
 
 ```gitignore
-# Generated test copies
+# Generated tests
 fixtures/generated/
 
-# Keep one file in an otherwise filtered directory
+# Exclude experiments except one smoke test
 experiments/*.test.ts
 !experiments/smoke.test.ts
 ```
 
-An ignored directory cannot be re-included by an exception for a file inside it; keep the parent directory traversable when using exceptions. Existing `.gitignore` rules are respected by default, including nested files outside Git repositories. In Git repositories, tracked files remain discoverable even if a Git ignore rule matches them. Test Studio exclusions also apply to tracked files. Use `respectGitignore: false` to scan Git-ignored files; dependencies, build outputs, symlinks, and nested repositories remain excluded.
+Ignore rules refresh automatically. Existing `.gitignore` rules are respected by default. Dependencies, build outputs, symlinks, and nested Git checkouts are skipped.
 
-Hidden source directories and native source folders are available to adapters. Add project-specific exclusions to `.teststudioignore` when needed.
+See [configuration](docs/reference.md#configuration), [ignore rules](docs/reference.md#ignore-rules), and the [JSON schema](schema.json) for the details.
 
-## Project environment
+## Good to know
 
-Tests inherit the shell environment and native runner configuration. Start any services or emulators required by the project before running its tests. Maestro requires a running simulator/device and the app targeted by the flow; Expo flows may also need Metro. Test Studio does not boot devices, start servers, seed data, or infer arbitrary setup commands. Follow the target project’s test setup instructions.
+- Discovery reads source without running it. Generated or duplicate test names can require a whole-file run; Maestro steps always run as a complete flow.
+- Test Studio uses your project's runner configuration and environment. Start any required services, emulators, or application servers before running tests.
+- Run trusted projects: tests, config modules, and adapters execute with your terminal's privileges. The UI server listens only on `127.0.0.1`.
+- Run history lasts for the server session. Reports are stored in the printed temporary directory. Windows process-tree cancellation has not been verified.
 
-## Boundaries and artifacts
+The [usage reference](docs/reference.md) covers discovery rules, runner configuration, reporting, timeouts, and execution boundaries.
 
-The server binds only to `127.0.0.1`, rejects unexpected hosts/origins, and requires a per-server session token for API access. It serves only discovered test sources. Processes receive argument arrays rather than shell commands. This is a tool for running **trusted local repositories**: tests, configuration modules, adapters, and their hooks have the same privileges as a terminal run.
+## Contributing
 
-JUnit reports and Maestro debug files go into a unique OS temporary directory for each run; the UI shows the path. History survives a browser refresh, but not a server restart. Pruning old runs deletes only their own temporary artifact directories. Retained run artifacts remain in the OS temp directory after shutdown. Output retains the last 100,000 characters per job; full JUnit reports remain on disk. Variables are redacted in command previews, but a test/runner can still print values into its own logs. Each job defaults to a 30-minute limit, configurable with `timeoutMs`. macOS/Linux process-group cancellation is supported; Windows process-tree cancellation has not been verified.
-
-## Formatting and verification
-
-```sh
-bun run format
-bun run lint:fix
-```
-
-Prettier uses tabs with a four-column width, double quotes, semicolons, LF line endings, and a 100-column print width. ESLint applies the recommended JavaScript and TypeScript rules, with browser, Node.js, and Bun globals for the appropriate files.
-
-Run the checks before submitting changes:
-
-```sh
-bun run format:check
-bun run lint
-bun run typecheck
-bun run test
-npm run test:package
-```
-
-The integration suite launches real processes against temporary projects and a local HTTP server. It covers built-in and custom adapters, config loading, ignore rules, filtering, failures, zero-result runs, cancellation, timeouts, queue exclusivity, report parsing, and the local API boundary. `test:package` launches the packed npm artifact through both npx and bunx in an isolated project, then checks config initialization, SDK imports, custom adapter execution in terminal and UI modes, and compiled UI assets with only Node and system tools on PATH. It may download dependencies during installation.
-
-## Extending
-
-See [Writing adapters](docs/adapters.md) and the runnable [Node checks example](examples/node-checks.mjs). New frameworks plug into the same discovery, execution, results, and UI interfaces used by the built-ins. You do not need to edit the server, queue, or frontend to register another adapter.
-
-The CLI loads project config and adapters; discovery walks the project once and asks adapters to inspect candidate files. The runner owns process lifecycle, cancellation, timeouts, and history. Adapters supply literal commands and normalized results, with JUnit as the default report format. The UI is an Expo web app built with TypeScript, React, and styled-components. It reads runner metadata from the same catalog API.
-
-See [Publishing releases](docs/releases.md) for verification and npm publication. Nothing is published automatically.
+Want to improve the UI, add a framework, or work on the runner? Start with **[development.md](development.md)** for local setup, the UI workflow, code organization, and checks. Adapter authors can jump straight to [Writing adapters](docs/adapters.md).
 
 ## License
 
-[MIT](LICENSE). The compiled UI includes `dist/web/THIRD_PARTY_NOTICES.txt` with the licenses of its bundled dependencies.
-
-Runner references: [Bun reporting](https://bun.sh/docs/test/reporters), [Bun test filtering](https://bun.sh/docs/test), [Maestro CLI options](https://docs.maestro.dev/maestro-cli/maestro-cli-commands-and-options). Packaging follows npm's [executable and files configuration](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/); configuration modules use [jiti](https://github.com/unjs/jiti) and ignore files use [node-ignore](https://github.com/kaelzhang/node-ignore).
+[MIT](LICENSE). Bundled UI dependency licenses are included in `dist/web/THIRD_PARTY_NOTICES.txt`.
