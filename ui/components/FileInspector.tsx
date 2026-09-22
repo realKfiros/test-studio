@@ -1,3 +1,7 @@
+import Play from "lucide-react-native/icons/play";
+import Code2 from "lucide-react-native/icons/code-xml";
+import ListChecks from "lucide-react-native/icons/list-checks";
+import { Icon } from "./Icon";
 import styled from "styled-components/native";
 import { observer } from "mobx-react-lite";
 import studioStore from "../stores";
@@ -25,12 +29,15 @@ const Tabs = styled.View`
 	border-color: ${({ theme }) => theme.colors.border};
 `;
 const Tab = styled.Pressable<{ $active: boolean }>`
-	padding: 13px 0px;
+	padding: 11px 0px;
+	flex-direction: row;
+	align-items: center;
+	gap: 7px;
 	border-bottom-width: 2px;
-	border-bottom-color: ${({ $active, theme }) => ($active ? theme.colors.success : "transparent")};
+	border-bottom-color: ${({ $active, theme }) => ($active ? theme.colors.accent : "transparent")};
 `;
 const TabLabel = styled(BodyText)<{ $active: boolean }>`
-	font-size: 11px;
+	font-size: 12px;
 	color: ${({ $active, theme }) => ($active ? theme.colors.secondaryText : theme.colors.muted)};
 `;
 
@@ -48,7 +55,7 @@ export const FileInspector = observer(function FileInspector() {
 		<>
 			<InspectorHeading>
 				<Overline>
-					<Badge>{file.runner.toUpperCase()}</Badge>
+					<Badge>{runner?.label ?? file.runner}</Badge>
 					{file.platform && <Badge>{file.platform}</Badge>}
 					<Caption>
 						{file.steps
@@ -59,11 +66,12 @@ export const FileInspector = observer(function FileInspector() {
 				<TitleRow>
 					<HeadingText>{file.name}</HeadingText>
 					<Button
+						icon={Play}
 						compact
 						disabled={!runner?.available || studioStore.busy}
 						onPress={() => void studioStore.start([{ fileId: file.id }])}
 					>
-						▶ Run {file.steps ? "flow" : "file"}
+						Run {file.steps ? "flow" : "file"}
 					</Button>
 				</TitleRow>
 				<PathText selectable>{file.path}</PathText>
@@ -77,6 +85,7 @@ export const FileInspector = observer(function FileInspector() {
 						$active={studioStore.tab === tab}
 						onPress={() => studioStore.setTab(tab)}
 					>
+						<Icon icon={tab === "source" ? Code2 : ListChecks} size={14} />
 						<TabLabel $active={studioStore.tab === tab}>
 							{tab === "source" ? "Source" : file.steps ? "Flow steps" : "Tests"}
 						</TabLabel>

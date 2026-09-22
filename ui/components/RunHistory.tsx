@@ -1,3 +1,4 @@
+import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import styled from "styled-components/native";
 import { observer } from "mobx-react-lite";
 import studioStore from "../stores";
@@ -35,8 +36,13 @@ export const RunHistory = observer(function RunHistory() {
 		<>
 			<InspectorHeading>
 				<BackRow>
-					<Button compact variant="quiet" onPress={studioStore.showFiles}>
-						← Back to tests
+					<Button
+						icon={ArrowLeft}
+						compact
+						variant="quiet"
+						onPress={studioStore.showFiles}
+					>
+						Back to tests
 					</Button>
 				</BackRow>
 				<TitleRow>

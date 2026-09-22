@@ -1,3 +1,6 @@
+import ArrowLeft from "lucide-react-native/icons/arrow-left";
+import Square from "lucide-react-native/icons/square";
+import RotateCw from "lucide-react-native/icons/rotate-cw";
 import { Fragment } from "react";
 import styled from "styled-components/native";
 import { observer } from "mobx-react-lite";
@@ -16,21 +19,21 @@ const BackRow = styled.View`
 	margin-bottom: 12px;
 `;
 const ProgressTrack = styled.View`
-	height: 3px;
-	margin-top: 22px;
-	background-color: #eef1e8;
+	height: 2px;
+	margin-top: 16px;
+	background-color: ${({ theme }) => theme.colors.border};
 `;
 const ProgressFill = styled.View<{ $percent: number }>`
-	height: 3px;
+	height: 2px;
 	width: ${({ $percent }) => $percent}%;
-	background-color: #95ac7d;
+	background-color: ${({ theme }) => theme.colors.success};
 `;
 const Summary = styled.View`
 	flex-direction: row;
 	flex-wrap: wrap;
 	gap: 12px;
-	padding: 13px 24px;
-	background-color: #fafbf7;
+	padding: 10px 24px;
+	background-color: ${({ theme }) => theme.colors.surface};
 	border-bottom-width: 1px;
 	border-color: ${({ theme }) => theme.colors.border};
 `;
@@ -52,22 +55,22 @@ const JobButton = styled.Pressable<{ $active: boolean }>`
 const JobName = styled(BodyText)`
 	flex: 1;
 	min-width: 0px;
-	font-size: 11px;
+	font-size: 12px;
 `;
 const Command = styled(MonoText)`
-	padding: 14px 24px;
-	background-color: #223126;
-	color: #9bae8f;
-	font-size: 9px;
+	padding: 10px 24px;
+	background-color: ${({ theme }) => theme.colors.terminal};
+	color: ${({ theme }) => theme.colors.muted};
+	font-size: 11px;
 	line-height: 16px;
 `;
 const Results = styled.ScrollView.attrs({
 	contentContainerStyle: { paddingVertical: 10, paddingHorizontal: 24 },
 })`
-	max-height: 150px;
+	max-height: 180px;
 	flex-grow: 0;
 	flex-shrink: 0;
-	background-color: #f8faf5;
+	background-color: ${({ theme }) => theme.colors.surface};
 `;
 const ResultRow = styled.View`
 	flex-direction: row;
@@ -89,7 +92,7 @@ const Meta = styled.View`
 const ArtifactPath = styled(Caption)`
 	flex: 1;
 	min-width: 0px;
-	font-size: 9px;
+	font-size: 11px;
 `;
 
 export const RunInspector = observer(function RunInspector() {
@@ -108,32 +111,38 @@ export const RunInspector = observer(function RunInspector() {
 		<>
 			<InspectorHeading>
 				<BackRow>
-					<Button compact variant="quiet" onPress={studioStore.showFiles}>
-						← Back to tests
+					<Button
+						icon={ArrowLeft}
+						compact
+						variant="quiet"
+						onPress={studioStore.showFiles}
+					>
+						Back to tests
 					</Button>
 				</BackRow>
 				<Overline>
-					<Badge status={run.status}>{run.status.toUpperCase()}</Badge>
+					<Badge status={run.status}>{run.status}</Badge>
 					<Caption>{new Date(run.startedAt).toLocaleTimeString()}</Caption>
-					{!run.finishedAt && <Caption>● LIVE</Caption>}
+					{!run.finishedAt && <StatusText $status="running">Live</StatusText>}
 				</Overline>
 				<TitleRow>
 					<HeadingText>{runName(run)}</HeadingText>
 					<Actions>
 						{!run.finishedAt ? (
-							<Button compact onPress={() => void studioStore.stop()}>
-								■ Stop
+							<Button icon={Square} compact onPress={() => void studioStore.stop()}>
+								Stop
 							</Button>
 						) : (
 							<>
 								<Button
+									icon={RotateCw}
 									compact
 									disabled={studioStore.busy}
 									onPress={() =>
 										void studioStore.start(run.jobs.map((job) => job.selection))
 									}
 								>
-									↻ Rerun
+									Rerun
 								</Button>
 								{!!failed.length && (
 									<Button

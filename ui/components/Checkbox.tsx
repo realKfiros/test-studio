@@ -1,5 +1,8 @@
 import styled from "styled-components/native";
-import { BodyText } from "../styles/typography";
+import Check from "lucide-react-native/icons/check";
+import Minus from "lucide-react-native/icons/minus";
+import { useTheme } from "styled-components/native";
+import { Icon } from "./Icon";
 
 interface CheckboxProps {
 	label: string;
@@ -18,15 +21,10 @@ const Box = styled.View<{ $checked: boolean }>`
 	height: 15px;
 	border-radius: 3px;
 	border-width: 1px;
-	border-color: ${({ $checked, theme }) => ($checked ? theme.colors.green : theme.colors.muted)};
-	background-color: ${({ $checked, theme }) => ($checked ? theme.colors.green : theme.colors.surface)};
+	border-color: ${({ $checked, theme }) => ($checked ? theme.colors.accent : theme.colors.muted)};
+	background-color: ${({ $checked, theme }) => ($checked ? theme.colors.accent : theme.colors.surface)};
 	align-items: center;
 	justify-content: center;
-`;
-const Mark = styled(BodyText)`
-	color: ${({ theme }) => theme.colors.surface};
-	font-size: 11px;
-	line-height: 13px;
 `;
 
 export function Checkbox({
@@ -36,6 +34,7 @@ export function Checkbox({
 	disabled = false,
 	onValueChange,
 }: CheckboxProps) {
+	const theme = useTheme();
 	return (
 		<HitTarget
 			accessibilityRole="checkbox"
@@ -47,7 +46,13 @@ export function Checkbox({
 			onPress={() => onValueChange(indeterminate || !checked)}
 		>
 			<Box $checked={checked || indeterminate}>
-				<Mark>{indeterminate ? "−" : checked ? "✓" : ""}</Mark>
+				{(checked || indeterminate) && (
+					<Icon
+						icon={indeterminate ? Minus : Check}
+						size={12}
+						color={theme.colors.onPrimary}
+					/>
+				)}
 			</Box>
 		</HitTarget>
 	);

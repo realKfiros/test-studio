@@ -1,4 +1,7 @@
 import { useState } from "react";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import Check from "lucide-react-native/icons/check";
+import { Icon } from "./Icon";
 import styled from "styled-components/native";
 import { BodyText, Caption } from "../styles/typography";
 import { Dialog } from "./Dialog";
@@ -15,7 +18,9 @@ const Trigger = styled.Pressable`
 	gap: 8px;
 	padding: 7px 8px;
 	border-radius: 4px;
-	background-color: ${({ theme }) => theme.colors.selected};
+	border-width: 1px;
+	border-color: ${({ theme }) => theme.colors.border};
+	background-color: ${({ theme }) => theme.colors.raised};
 	max-width: 190px;
 	flex-shrink: 1;
 `;
@@ -47,7 +52,7 @@ export function Select({ label, value, options, onValueChange }: SelectProps) {
 				onPress={() => setOpen(true)}
 			>
 				<Value numberOfLines={1}>{selected?.label ?? value}</Value>
-				<Caption>⌄</Caption>
+				<Icon icon={ChevronDown} size={12} />
 			</Trigger>
 			<Dialog title={label} open={open} onClose={() => setOpen(false)}>
 				{options.map((option) => (
@@ -63,7 +68,7 @@ export function Select({ label, value, options, onValueChange }: SelectProps) {
 						}}
 					>
 						<OptionLabel>{option.label}</OptionLabel>
-						<BodyText>{option.value === value ? "✓" : ""}</BodyText>
+						{option.value === value && <Icon icon={Check} size={14} />}
 					</Option>
 				))}
 			</Dialog>

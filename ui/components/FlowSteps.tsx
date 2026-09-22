@@ -8,7 +8,7 @@ const Step = styled.View`
 	gap: 10px;
 	padding: 12px 0px;
 	border-bottom-width: 1px;
-	border-color: #f0f3eb;
+	border-color: ${({ theme }) => theme.colors.border};
 `;
 const Name = styled(BodyText)`
 	flex: 1;

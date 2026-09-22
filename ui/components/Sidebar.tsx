@@ -1,84 +1,83 @@
 import styled from "styled-components/native";
 import { useWindowDimensions } from "react-native";
+import Files from "lucide-react-native/icons/files";
+import Folder from "lucide-react-native/icons/folder";
+import FolderOpen from "lucide-react-native/icons/folder-open";
+import Terminal from "lucide-react-native/icons/terminal";
+import Smartphone from "lucide-react-native/icons/smartphone";
+import FlaskConical from "lucide-react-native/icons/flask-conical";
 import { observer } from "mobx-react-lite";
 import studioStore from "../stores";
 import { runName, workspaceName } from "../model";
 import { BodyText, Caption } from "../styles/typography";
+import { Icon } from "./Icon";
 
-const Container = styled.View<{ $width: number }>`
-	width: ${({ $width }) => $width}px;
+const Container = styled.View<{ $compact: boolean }>`
+	width: ${({ $compact }) => ($compact ? 48 : 204)}px;
 	background-color: ${({ theme }) => theme.colors.sidebar};
-	padding: 24px 12px 16px;
+	border-right-width: 1px;
+	border-color: ${({ theme }) => theme.colors.border};
 	flex-shrink: 0;
 `;
-const Navigation = styled.ScrollView`
-	flex: 1;
-`;
-const Project = styled.View`
+const Project = styled.View<{ $compact: boolean }>`
+	min-height: 53px;
 	flex-direction: row;
 	align-items: center;
 	gap: 10px;
-	border-width: 1px;
-	border-color: #3c4e44;
-	border-radius: 8px;
-	padding: 12px 10px;
-	margin-bottom: 28px;
-`;
-const ProjectDetails = styled.View`
-	flex: 1;
-	gap: 4px;
+	padding: 12px ${({ $compact }) => ($compact ? 15 : 16)}px;
+	border-bottom-width: 1px;
+	border-color: ${({ theme }) => theme.colors.border};
 `;
 const ProjectName = styled(BodyText)`
-	color: #e5eee7;
 	font-weight: 600;
+	flex: 1;
 `;
-const ProjectIcon = styled(BodyText)`
-	color: #c1cabc;
-	font-size: 20px;
+const Navigation = styled.ScrollView.attrs({
+	contentContainerStyle: { paddingVertical: 18, paddingHorizontal: 8 },
+})`
+	flex: 1;
 `;
 const Label = styled(Caption)<{ $spaced?: boolean }>`
-	font-size: 9px;
-	letter-spacing: 1.6px;
-	color: #7f9687;
-	margin: ${({ $spaced }) => ($spaced ? 30 : 0)}px 12px 12px;
+	font-size: 11px;
+	font-weight: 500;
+	margin: ${({ $spaced }) => ($spaced ? 26 : 0)}px 8px 8px;
 `;
 const NavButton = styled.Pressable<{ $active: boolean; $compact: boolean }>`
 	flex-direction: row;
 	align-items: center;
 	justify-content: ${({ $compact }) => ($compact ? "center" : "flex-start")};
-	gap: 10px;
-	padding: 12px 8px;
-	border-radius: 6px;
-	margin-bottom: 3px;
-	background-color: ${({ $active }) => ($active ? "#30463a" : "transparent")};
+	gap: 9px;
+	min-height: 32px;
+	padding: 7px 8px;
+	border-radius: 3px;
+	margin-bottom: 2px;
+	background-color: ${({ $active, theme }) => ($active ? theme.colors.raised : "transparent")};
 `;
-const NavText = styled(BodyText)`
-	color: #abc0b1;
+const NavText = styled(BodyText)<{ $active?: boolean }>`
+	color: ${({ $active, theme }) => ($active ? theme.colors.text : theme.colors.secondaryText)};
+	font-size: 12px;
 	flex: 1;
 `;
-const NavIcon = styled(BodyText)`
-	color: #94b39e;
-	font-size: 15px;
-`;
 const Count = styled(Caption)`
-	color: #9ab8a3;
-	font-size: 9px;
+	font-family: ${({ theme }) => theme.fonts.mono};
+	font-size: 10px;
 `;
 const Dot = styled.View<{ $status: string }>`
-	width: 6px;
-	height: 6px;
+	width: 5px;
+	height: 5px;
 	border-radius: 3px;
-	background-color: ${({ $status }) => (["failed", "offline"].includes($status) ? "#dc8e7b" : $status === "running" ? "#dbbe79" : "#84c598")};
+	background-color: ${({ $status, theme }) => ($status === "failed" || $status === "offline" ? theme.colors.danger : $status === "running" ? theme.colors.warning : $status === "passed" ? theme.colors.success : theme.colors.muted)};
 `;
 const Empty = styled(Caption)`
-	padding: 0px 12px;
-	color: #80978a;
+	padding: 4px 8px;
 `;
 const Connection = styled.View`
 	flex-direction: row;
 	align-items: center;
-	gap: 6px;
-	padding: 24px 8px 0px;
+	gap: 8px;
+	padding: 11px 16px;
+	border-top-width: 1px;
+	border-color: ${({ theme }) => theme.colors.border};
 `;
 
 export const Sidebar = observer(function Sidebar() {
@@ -91,44 +90,48 @@ export const Sidebar = observer(function Sidebar() {
 			...(catalog?.files.map((file) => file.runner) ?? []),
 		]),
 	];
-	const workspaces = studioStore.workspaces;
 	return (
-		<Container $width={compact ? 62 : width <= 1100 ? 190 : 224}>
-			<Navigation accessibilityLabel="Test navigation">
+		<Container $compact={compact}>
+			<Project $compact={compact}>
+				<Icon icon={FolderOpen} size={17} />
 				{!compact && (
-					<>
-						<Project>
-							<ProjectIcon>⌘</ProjectIcon>
-							<ProjectDetails>
-								<ProjectName numberOfLines={2} accessibilityHint={catalog?.root}>
-									{catalog?.name ?? "Discovering…"}
-								</ProjectName>
-								<Caption>Local workspace</Caption>
-							</ProjectDetails>
-							<Dot $status={studioStore.connected ? "passed" : "offline"} />
-						</Project>
-						<Label>EXPLORER</Label>
-					</>
+					<ProjectName numberOfLines={1} accessibilityHint={catalog?.root}>
+						{catalog?.name ?? "Opening project…"}
+					</ProjectName>
 				)}
+			</Project>
+			<Navigation accessibilityLabel="Test navigation">
+				{!compact && <Label>Runners</Label>}
 				{["all", ...runners].map((id) => {
 					const label =
 						id === "all"
 							? "All tests"
 							: (catalog?.runners.find((runner) => runner.id === id)?.label ?? id);
+					const active = studioStore.filters.runner === id;
+					const icon =
+						id === "all"
+							? Files
+							: id === "bun"
+								? Terminal
+								: id === "maestro"
+									? Smartphone
+									: FlaskConical;
 					return (
 						<NavButton
 							key={id}
 							accessibilityRole="button"
 							accessibilityLabel={label}
-							aria-selected={studioStore.filters.runner === id}
-							$active={studioStore.filters.runner === id}
+							aria-selected={active}
+							$active={active}
 							$compact={compact}
 							onPress={() => studioStore.setRunner(id)}
 						>
-							<NavIcon>{id === "all" ? "▦" : "◉"}</NavIcon>
+							<Icon icon={icon} size={15} />
 							{!compact && (
 								<>
-									<NavText numberOfLines={1}>{label}</NavText>
+									<NavText $active={active} numberOfLines={1}>
+										{label}
+									</NavText>
 									<Count>
 										{catalog?.files.filter(
 											(file) => id === "all" || file.runner === id,
@@ -141,8 +144,8 @@ export const Sidebar = observer(function Sidebar() {
 				})}
 				{!compact && (
 					<>
-						<Label $spaced>WORKSPACES</Label>
-						{workspaces.map((workspace) => (
+						<Label $spaced>Workspaces</Label>
+						{studioStore.workspaces.map((workspace) => (
 							<NavButton
 								key={workspace}
 								accessibilityRole="button"
@@ -152,7 +155,7 @@ export const Sidebar = observer(function Sidebar() {
 								$compact={false}
 								onPress={() => studioStore.toggleWorkspace(workspace)}
 							>
-								<NavIcon>⌑</NavIcon>
+								<Icon icon={Folder} size={14} />
 								<NavText numberOfLines={1}>{workspaceName(workspace)}</NavText>
 								<Count>
 									{
@@ -163,7 +166,7 @@ export const Sidebar = observer(function Sidebar() {
 								</Count>
 							</NavButton>
 						))}
-						<Label $spaced>RECENT RUNS · {studioStore.runs.length}</Label>
+						<Label $spaced>Recent runs</Label>
 						{studioStore.runs.length ? (
 							studioStore.runs.map((run) => (
 								<NavButton
@@ -187,7 +190,7 @@ export const Sidebar = observer(function Sidebar() {
 								</NavButton>
 							))
 						) : (
-							<Empty>No runs yet.</Empty>
+							<Empty>No runs yet</Empty>
 						)}
 					</>
 				)}
@@ -195,11 +198,7 @@ export const Sidebar = observer(function Sidebar() {
 			{!compact && (
 				<Connection accessibilityLiveRegion="polite">
 					<Dot $status={studioStore.connected ? "passed" : "offline"} />
-					<Count>
-						{studioStore.connected
-							? "Auto-discovery is on"
-							: "Disconnected · retrying…"}
-					</Count>
+					<Caption>{studioStore.connected ? "Connected" : "Reconnecting…"}</Caption>
 				</Connection>
 			)}
 		</Container>

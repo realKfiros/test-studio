@@ -25,5 +25,8 @@ const html = await readFile(entry, "utf8");
 if (!html.includes("</head>")) throw new Error("Expo export is missing an HTML head.");
 await writeFile(
 	entry,
-	html.replace("</head>", '<meta name="test-studio-token" content="__SESSION_TOKEN__" /></head>'),
+	html.replace(
+		"</head>",
+		'<meta name="test-studio-token" content="__SESSION_TOKEN__" /><meta name="color-scheme" content="dark" /></head>',
+	),
 );

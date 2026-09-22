@@ -11,7 +11,7 @@ const OutputScroll = styled(ScrollView).attrs({
 	background-color: ${({ theme }) => theme.colors.terminal};
 `;
 const OutputText = styled(MonoText)`
-	color: #b7c7a9;
+	color: ${({ theme }) => theme.colors.secondaryText};
 `;
 
 export function LiveOutput({ output, jobId }: { output: string; jobId: string }) {

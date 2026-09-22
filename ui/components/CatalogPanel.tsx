@@ -1,3 +1,7 @@
+import Search from "lucide-react-native/icons/search";
+import FileCode2 from "lucide-react-native/icons/file-code-corner";
+import ListChecks from "lucide-react-native/icons/list-checks";
+import { Icon } from "./Icon";
 import { Fragment, type RefObject } from "react";
 import { TextInput, useWindowDimensions } from "react-native";
 import styled from "styled-components/native";
@@ -17,10 +21,10 @@ const Container = styled.View<{ $mobile: boolean; $width: number }>`
 	border-right-width: ${({ $mobile }) => ($mobile ? 0 : 1)}px;
 	border-bottom-width: ${({ $mobile }) => ($mobile ? 1 : 0)}px;
 	border-color: ${({ theme }) => theme.colors.border};
-	background-color: #fcfdfa;
+	background-color: ${({ theme }) => theme.colors.surface};
 `;
 const Toolbar = styled.View`
-	padding: 16px;
+	padding: 12px;
 	border-bottom-width: 1px;
 	border-color: ${({ theme }) => theme.colors.border};
 `;
@@ -31,15 +35,18 @@ const SearchRow = styled.View`
 	border-width: 1px;
 	border-color: ${({ theme }) => theme.colors.border};
 	background-color: ${({ theme }) => theme.colors.surface};
-	border-radius: 6px;
+	border-radius: 4px;
 	padding: 0px 10px;
 `;
-const SearchInput = styled(TextInput)`
-	height: 36px;
+const SearchInput = styled(TextInput).attrs(({ theme }) => ({
+	placeholderTextColor: theme.colors.muted,
+	selectionColor: theme.colors.accent,
+}))`
+	height: 30px;
 	flex: 1;
 	min-width: 0px;
 	font-family: ${({ theme }) => theme.fonts.body};
-	font-size: 11px;
+	font-size: 12px;
 	color: ${({ theme }) => theme.colors.secondaryText};
 `;
 const Filters = styled.View`
@@ -47,15 +54,15 @@ const Filters = styled.View`
 	align-items: center;
 	justify-content: space-between;
 	gap: 4px;
-	margin-top: 12px;
+	margin-top: 8px;
 `;
 const ListHeading = styled.View`
 	flex-direction: row;
 	justify-content: space-between;
-	padding: 15px 16px 9px;
+	padding: 14px 16px 6px;
 `;
 const List = styled.ScrollView.attrs({
-	contentContainerStyle: { paddingHorizontal: 9, paddingBottom: 12 },
+	contentContainerStyle: { paddingHorizontal: 0, paddingBottom: 12 },
 })`
 	flex: 1;
 	min-height: 0px;
@@ -64,14 +71,16 @@ const Group = styled.View`
 	flex-direction: row;
 	align-items: center;
 	justify-content: space-between;
-	padding: 14px 7px 8px;
+	padding: 12px 16px 8px;
 `;
 const FileRow = styled.View<{ $active: boolean }>`
 	flex-direction: row;
 	align-items: center;
 	gap: 4px;
-	padding: 7px 2px;
-	border-radius: 6px;
+	padding: 7px 10px;
+	min-height: 48px;
+	border-left-width: 2px;
+	border-left-color: ${({ $active, theme }) => ($active ? theme.colors.accent : "transparent")};
 	background-color: ${({ $active, theme }) => ($active ? theme.colors.selected : "transparent")};
 `;
 const OpenFile = styled.Pressable`
@@ -82,17 +91,10 @@ const OpenFile = styled.Pressable`
 	gap: 10px;
 	padding: 3px 4px;
 `;
-const FileIcon = styled(Caption)`
-	background-color: #e5ecdc;
-	color: #7a8c6c;
-	padding: 4px;
-	border-radius: 3px;
-	font-size: 9px;
-`;
 const FileInfo = styled.View`
 	flex: 1;
 	min-width: 0px;
-	gap: 5px;
+	gap: 3px;
 `;
 const Footer = styled.View`
 	flex-direction: row;
@@ -114,12 +116,12 @@ export const CatalogPanel = observer(function CatalogPanel({
 		if (group) group.push(file);
 		else groups.set(file.workspace, [file]);
 	}
-	const panelWidth = width > 1100 ? Math.max(300, (width - 296) * 0.36) : width > 800 ? 300 : 260;
+	const panelWidth = width > 1100 ? 340 : width > 800 ? 300 : 280;
 	return (
 		<Container $mobile={width <= 600} $width={panelWidth}>
 			<Toolbar>
 				<SearchRow>
-					<Caption>⌕</Caption>
+					<Icon icon={Search} size={14} />
 					<SearchInput
 						ref={searchRef}
 						accessibilityLabel="Search files, tests, and tags"
@@ -144,7 +146,7 @@ export const CatalogPanel = observer(function CatalogPanel({
 						onValueChange={studioStore.setPlatform}
 					/>
 					<Button compact variant="quiet" onPress={studioStore.selectVisible}>
-						Select visible
+						Select all
 					</Button>
 					<Button compact variant="quiet" onPress={studioStore.clearSelection}>
 						Clear
@@ -152,8 +154,8 @@ export const CatalogPanel = observer(function CatalogPanel({
 				</Filters>
 			</Toolbar>
 			<ListHeading>
-				<Caption>TEST FILES</Caption>
-				<Caption>{studioStore.files.length} files</Caption>
+				<BodyText>Files</BodyText>
+				<Caption>{studioStore.files.length}</Caption>
 			</ListHeading>
 			<List accessibilityLabel="Discovered test files">
 				{[...groups].map(([workspace, files]) => (
@@ -188,11 +190,10 @@ export const CatalogPanel = observer(function CatalogPanel({
 										accessibilityHint={file.path}
 										onPress={() => studioStore.openFile(file.id)}
 									>
-										<FileIcon>
-											{(runner?.label ?? file.runner)
-												.slice(0, 2)
-												.toUpperCase()}
-										</FileIcon>
+										<Icon
+											icon={file.steps ? ListChecks : FileCode2}
+											size={16}
+										/>
 										<FileInfo>
 											<BodyText numberOfLines={1}>{file.name}</BodyText>
 											<Caption numberOfLines={1}>
@@ -211,12 +212,8 @@ export const CatalogPanel = observer(function CatalogPanel({
 				{!studioStore.files.length && <Note>No tests match these filters.</Note>}
 			</List>
 			<Footer>
-				<Caption>
-					{studioStore.catalog
-						? `Scanned ${new Date(studioStore.catalog.scannedAt).toLocaleTimeString()}`
-						: "Scanning project…"}
-				</Caption>
-				<Caption>↻ 5s</Caption>
+				<Caption>{studioStore.selected.size} selected</Caption>
+				<Caption>Auto-discovery</Caption>
 			</Footer>
 		</Container>
 	);

@@ -14,7 +14,7 @@ import { FileInspector } from "./components/FileInspector";
 import { RunInspector } from "./components/RunInspector";
 import { RunHistory } from "./components/RunHistory";
 import { SettingsDialog } from "./components/SettingsDialog";
-import { Caption, BodyText } from "./styles/typography";
+import { BodyText } from "./styles/typography";
 
 const Shell = styled.View`
 	flex: 1;
@@ -24,27 +24,23 @@ const Shell = styled.View`
 const PageScroll = styled.ScrollView.attrs({ contentContainerStyle: { flexGrow: 1 } })`
 	flex: 1;
 `;
-const Main = styled.View<{ $mobile: boolean; $height: number; $padding: number }>`
+const Main = styled.View<{ $mobile: boolean; $height: number }>`
 	min-height: ${({ $height }) => $height}px;
 	${({ $mobile, $height }) => ($mobile ? "" : `height: ${Math.max($height, 700)}px;`)}
-	padding: 0px ${({ $padding }) => $padding}px;
 `;
 const Notice = styled(BodyText)`
 	border-width: 1px;
-	border-color: #e3d6bd;
-	background-color: #fff9e9;
-	color: #806a47;
+	border-color: ${({ theme }) => theme.colors.warning};
+	background-color: ${({ theme }) => theme.colors.warningSurface};
+	color: ${({ theme }) => theme.colors.warning};
 	border-radius: 6px;
 	padding: 10px 14px;
-	margin-bottom: 12px;
+	margin: 12px 16px;
 `;
 const StudioPanel = styled.View<{ $mobile: boolean }>`
 	flex: ${({ $mobile }) => ($mobile ? "0 0 auto" : "1")};
 	flex-direction: ${({ $mobile }) => ($mobile ? "column" : "row")};
 	min-height: 440px;
-	border-width: 1px;
-	border-color: ${({ theme }) => theme.colors.border};
-	border-radius: 10px;
 	overflow: hidden;
 	background-color: ${({ theme }) => theme.colors.surface};
 `;
@@ -52,10 +48,6 @@ const Inspector = styled.View<{ $mobile: boolean }>`
 	flex: ${({ $mobile }) => ($mobile ? "0 0 auto" : "1")};
 	min-width: 0px;
 	${({ $mobile }) => ($mobile ? "height: 520px;" : "")}
-`;
-const Footer = styled(Caption)`
-	padding: 15px 0px;
-	font-size: 9px;
 `;
 
 const App = observer(function App() {
@@ -73,13 +65,8 @@ const App = observer(function App() {
 			<Shell>
 				<Sidebar />
 				<PageScroll>
-					<Main
-						$mobile={mobile}
-						$height={height}
-						$padding={width <= 800 ? 16 : width <= 1100 ? 22 : 36}
-					>
+					<Main $mobile={mobile} $height={height}>
 						<Toolbar />
-						<DiscoverySummary catalog={studioStore.catalog} />
 						{!!studioStore.notice && (
 							<Notice accessibilityRole="alert">{studioStore.notice}</Notice>
 						)}
@@ -95,9 +82,7 @@ const App = observer(function App() {
 								)}
 							</Inspector>
 						</StudioPanel>
-						<Footer>
-							Detected: {studioStore.catalog?.libraries.join(" · ") || "none yet"}
-						</Footer>
+						<DiscoverySummary catalog={studioStore.catalog} />
 					</Main>
 				</PageScroll>
 				<SettingsDialog />

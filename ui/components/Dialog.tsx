@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import X from "lucide-react-native/icons/x";
 import { Modal } from "react-native";
 import styled from "styled-components/native";
 import { HeadingText, TitleRow } from "../styles/inspector";
@@ -12,7 +13,7 @@ interface DialogProps {
 }
 const Overlay = styled.View`
 	flex: 1;
-	background-color: #192c2766;
+	background-color: #00000099;
 	align-items: center;
 	justify-content: center;
 	padding: 20px;
@@ -30,7 +31,7 @@ const Panel = styled.View`
 	max-height: 90%;
 	border-width: 1px;
 	border-color: ${({ theme }) => theme.colors.border};
-	border-radius: 12px;
+	border-radius: 6px;
 	background-color: ${({ theme }) => theme.colors.surface};
 	padding: 24px;
 	gap: 20px;
@@ -53,12 +54,11 @@ export function Dialog({ title, open, onClose, children }: DialogProps) {
 						<HeadingText>{title}</HeadingText>
 						<Button
 							compact
+							icon={X}
 							variant="quiet"
 							accessibilityLabel={`Close ${title.toLowerCase()}`}
 							onPress={onClose}
-						>
-							×
-						</Button>
+						/>
 					</TitleRow>
 					<Content>{children}</Content>
 				</Panel>

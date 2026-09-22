@@ -9,12 +9,15 @@ const Field = styled.View`
 	gap: 8px;
 	margin: 10px 0px 18px;
 `;
-const Input = styled.TextInput`
+const Input = styled.TextInput.attrs(({ theme }) => ({
+	placeholderTextColor: theme.colors.muted,
+	selectionColor: theme.colors.accent,
+}))`
 	border-width: 1px;
 	border-color: ${({ theme }) => theme.colors.border};
-	border-radius: 6px;
+	border-radius: 4px;
 	padding: 10px;
-	background-color: #fcfdfb;
+	background-color: ${({ theme }) => theme.colors.background};
 	color: ${({ theme }) => theme.colors.secondaryText};
 	font-family: ${({ theme }) => theme.fonts.body};
 	font-size: 12px;

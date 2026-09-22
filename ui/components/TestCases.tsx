@@ -1,3 +1,4 @@
+import Play from "lucide-react-native/icons/play";
 import { Fragment } from "react";
 import styled from "styled-components/native";
 import { observer } from "mobx-react-lite";
@@ -8,15 +9,19 @@ import { Badge } from "./Badge";
 import { Button } from "./Button";
 
 const Group = styled(Caption)`
-	padding: 14px 0px 8px;
+	padding: 8px 0px 12px;
+	color: ${({ theme }) => theme.colors.text};
+	font-size: 12px;
+	font-weight: 500;
 `;
 const TestRow = styled.View`
 	flex-direction: row;
 	align-items: center;
 	gap: 8px;
-	padding: 8px 0px;
+	padding: 5px 0px;
+	min-height: 39px;
 	border-bottom-width: 1px;
-	border-color: #f0f3eb;
+	border-color: ${({ theme }) => theme.colors.border};
 `;
 const Name = styled(BodyText)`
 	flex: 1;
@@ -46,7 +51,7 @@ export const TestCases = observer(function TestCases() {
 				previousGroup = group;
 				return (
 					<Fragment key={test.id}>
-						{heading && <Group>⌄ {group}</Group>}
+						{heading && <Group>{group}</Group>}
 						<TestRow>
 							<Checkbox
 								label={`Select test ${test.fullName}`}
@@ -63,6 +68,7 @@ export const TestCases = observer(function TestCases() {
 							{test.mode !== "normal" && <Badge>{test.mode}</Badge>}
 							<Caption>:{test.line}</Caption>
 							<Button
+								icon={Play}
 								compact
 								variant="quiet"
 								accessibilityLabel={`Run test ${test.fullName}`}
@@ -77,9 +83,7 @@ export const TestCases = observer(function TestCases() {
 										{ fileId: file.id, caseIds: [test.id] },
 									])
 								}
-							>
-								▷
-							</Button>
+							/>
 						</TestRow>
 					</Fragment>
 				);
