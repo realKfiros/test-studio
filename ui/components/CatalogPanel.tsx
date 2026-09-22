@@ -2,7 +2,8 @@ import { Fragment, type RefObject } from "react";
 import { TextInput, useWindowDimensions } from "react-native";
 import styled from "styled-components/native";
 import type { TestFile } from "../../types";
-import type { Studio } from "../useStudio";
+import { observer } from "mobx-react-lite";
+import studioStore from "../stores";
 import { workspaceName } from "../model";
 import { Checkbox } from "./Checkbox";
 import { Select } from "./Select";
@@ -101,16 +102,14 @@ const Footer = styled.View`
 	padding: 12px 16px;
 `;
 
-export function CatalogPanel({
-	studio,
+export const CatalogPanel = observer(function CatalogPanel({
 	searchRef,
 }: {
-	studio: Studio;
 	searchRef: RefObject<TextInput | null>;
 }) {
 	const { width } = useWindowDimensions();
 	const groups = new Map<string, TestFile[]>();
-	for (const file of studio.files) {
+	for (const file of studioStore.files) {
 		const group = groups.get(file.workspace);
 		if (group) group.push(file);
 		else groups.set(file.workspace, [file]);
@@ -125,10 +124,8 @@ export function CatalogPanel({
 						ref={searchRef}
 						accessibilityLabel="Search files, tests, and tags"
 						placeholder="Search files, tests, tags…"
-						value={studio.filters.query}
-						onChangeText={(query) =>
-							studio.setFilters((filters) => ({ ...filters, query }))
-						}
+						value={studioStore.filters.query}
+						onChangeText={studioStore.setQuery}
 						autoCorrect={false}
 						autoCapitalize="none"
 						returnKeyType="search"
@@ -138,27 +135,25 @@ export function CatalogPanel({
 				<Filters>
 					<Select
 						label="Platform"
-						value={studio.filters.platform}
+						value={studioStore.filters.platform}
 						options={[
 							{ value: "all", label: "All platforms" },
 							{ value: "ios", label: "iOS" },
 							{ value: "android", label: "Android" },
 						]}
-						onValueChange={(platform) =>
-							studio.setFilters((filters) => ({ ...filters, platform }))
-						}
+						onValueChange={studioStore.setPlatform}
 					/>
-					<Button compact variant="quiet" onPress={studio.selectVisible}>
+					<Button compact variant="quiet" onPress={studioStore.selectVisible}>
 						Select visible
 					</Button>
-					<Button compact variant="quiet" onPress={() => studio.setSelected(new Map())}>
+					<Button compact variant="quiet" onPress={studioStore.clearSelection}>
 						Clear
 					</Button>
 				</Filters>
 			</Toolbar>
 			<ListHeading>
 				<Caption>TEST FILES</Caption>
-				<Caption>{studio.files.length} files</Caption>
+				<Caption>{studioStore.files.length} files</Caption>
 			</ListHeading>
 			<List accessibilityLabel="Discovered test files">
 				{[...groups].map(([workspace, files]) => (
@@ -168,25 +163,30 @@ export function CatalogPanel({
 							<Caption>{files.length}</Caption>
 						</Group>
 						{files.map((file) => {
-							const runner = studio.catalog?.runners.find(
+							const runner = studioStore.catalog?.runners.find(
 								(runner) => runner.id === file.runner,
 							);
 							return (
-								<FileRow key={file.id} $active={studio.currentFile?.id === file.id}>
+								<FileRow
+									key={file.id}
+									$active={studioStore.currentFile?.id === file.id}
+								>
 									<Checkbox
 										label={`Select ${file.name}`}
-										checked={studio.selected.has(file.id)}
-										indeterminate={studio.selected.get(file.id) instanceof Set}
+										checked={studioStore.selected.has(file.id)}
+										indeterminate={
+											studioStore.selected.get(file.id) instanceof Set
+										}
 										disabled={!runner}
 										onValueChange={(checked) =>
-											studio.selectFile(file.id, checked)
+											studioStore.selectFile(file.id, checked)
 										}
 									/>
 									<OpenFile
 										accessibilityRole="button"
 										accessibilityLabel={`Open ${file.name}`}
 										accessibilityHint={file.path}
-										onPress={() => studio.openFile(file.id)}
+										onPress={() => studioStore.openFile(file.id)}
 									>
 										<FileIcon>
 											{(runner?.label ?? file.runner)
@@ -208,16 +208,16 @@ export function CatalogPanel({
 						})}
 					</Fragment>
 				))}
-				{!studio.files.length && <Note>No tests match these filters.</Note>}
+				{!studioStore.files.length && <Note>No tests match these filters.</Note>}
 			</List>
 			<Footer>
 				<Caption>
-					{studio.catalog
-						? `Scanned ${new Date(studio.catalog.scannedAt).toLocaleTimeString()}`
+					{studioStore.catalog
+						? `Scanned ${new Date(studioStore.catalog.scannedAt).toLocaleTimeString()}`
 						: "Scanning project…"}
 				</Caption>
 				<Caption>↻ 5s</Caption>
 			</Footer>
 		</Container>
 	);
-}
+});

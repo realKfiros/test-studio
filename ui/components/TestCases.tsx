@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import styled from "styled-components/native";
-import type { Studio } from "../useStudio";
+import { observer } from "mobx-react-lite";
+import studioStore from "../stores";
 import { BodyText, Caption, Note } from "../styles/typography";
 import { Checkbox } from "./Checkbox";
 import { Badge } from "./Badge";
@@ -23,11 +24,11 @@ const Name = styled(BodyText)`
 	color: ${({ theme }) => theme.colors.secondaryText};
 `;
 
-export function TestCases({ studio }: { studio: Studio }) {
-	const file = studio.currentFile;
+export const TestCases = observer(function TestCases() {
+	const file = studioStore.currentFile;
 	if (!file) return null;
-	const runner = studio.catalog?.runners.find((runner) => runner.id === file.runner);
-	const selection = studio.selected.get(file.id);
+	const runner = studioStore.catalog?.runners.find((runner) => runner.id === file.runner);
+	const selection = studioStore.selected.get(file.id);
 	let previousGroup = "";
 	if (!file.cases.length)
 		return (
@@ -50,11 +51,13 @@ export function TestCases({ studio }: { studio: Studio }) {
 							<Checkbox
 								label={`Select test ${test.fullName}`}
 								checked={
-									studio.selected.has(file.id) &&
+									studioStore.selected.has(file.id) &&
 									(selection === null || !!selection?.has(test.id))
 								}
 								disabled={!test.runnable || !runner?.supportsIndividualTests}
-								onValueChange={(checked) => studio.selectCase(test.id, checked)}
+								onValueChange={(checked) =>
+									studioStore.selectCase(test.id, checked)
+								}
 							/>
 							<Name>{test.name}</Name>
 							{test.mode !== "normal" && <Badge>{test.mode}</Badge>}
@@ -67,10 +70,12 @@ export function TestCases({ studio }: { studio: Studio }) {
 									!test.runnable ||
 									!runner?.supportsIndividualTests ||
 									!runner.available ||
-									studio.busy
+									studioStore.busy
 								}
 								onPress={() =>
-									void studio.start([{ fileId: file.id, caseIds: [test.id] }])
+									void studioStore.start([
+										{ fileId: file.id, caseIds: [test.id] },
+									])
 								}
 							>
 								▷
@@ -81,4 +86,4 @@ export function TestCases({ studio }: { studio: Studio }) {
 			})}
 		</>
 	);
-}
+});

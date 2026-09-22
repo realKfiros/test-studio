@@ -1,7 +1,8 @@
 import { useWindowDimensions } from "react-native";
 import styled from "styled-components/native";
-import type { Studio } from "../useStudio";
-import { selectionsFor, workspaceName } from "../model";
+import { observer } from "mobx-react-lite";
+import studioStore from "../stores";
+import { workspaceName } from "../model";
 import { Actions, Row } from "../styles/layout";
 import { Caption } from "../styles/typography";
 import { Select } from "./Select";
@@ -24,22 +25,16 @@ const ToolbarActions = styled(Actions)`
 	flex-shrink: 1;
 `;
 
-export function Toolbar({
-	studio,
-	onOpenSettings,
-}: {
-	studio: Studio;
-	onOpenSettings: () => void;
-}) {
+export const Toolbar = observer(function Toolbar() {
 	const { width } = useWindowDimensions();
-	const workspaces = [...new Set(studio.catalog?.files.map((file) => file.workspace))].sort();
+	const workspaces = studioStore.workspaces;
 	return (
 		<Container>
 			<Row>
 				{width > 600 && <Caption>WORKSPACE /</Caption>}
 				<Select
 					label="Workspace"
-					value={studio.filters.workspace}
+					value={studioStore.filters.workspace}
 					options={[
 						{ value: "all", label: "All workspaces" },
 						...workspaces.map((workspace) => ({
@@ -47,36 +42,34 @@ export function Toolbar({
 							label: workspaceName(workspace),
 						})),
 					]}
-					onValueChange={(workspace) =>
-						studio.setFilters((filters) => ({ ...filters, workspace }))
-					}
+					onValueChange={studioStore.setWorkspace}
 				/>
 			</Row>
 			<ToolbarActions>
-				<Button compact variant="quiet" onPress={() => studio.setView("history")}>
+				<Button compact variant="quiet" onPress={studioStore.showHistory}>
 					◷ Runs
 				</Button>
-				<Button compact variant="quiet" onPress={onOpenSettings}>
+				<Button compact variant="quiet" onPress={studioStore.openSettings}>
 					⚙ Run settings
 				</Button>
 				<Button
 					compact
 					variant="quiet"
-					disabled={studio.scanning}
-					onPress={() => void studio.rescan()}
+					disabled={studioStore.scanning}
+					onPress={() => void studioStore.rescan()}
 				>
 					↻ Rescan
 				</Button>
 				<Button
 					variant="primary"
 					compact={width <= 600}
-					disabled={!studio.selected.size || studio.busy}
-					accessibilityHint={`${studio.selected.size} files selected; individual test filters are preserved`}
-					onPress={() => void studio.start(selectionsFor(studio.selected))}
+					disabled={!studioStore.selected.size || studioStore.busy}
+					accessibilityHint={`${studioStore.selected.size} files selected; individual test filters are preserved`}
+					onPress={() => void studioStore.startSelected()}
 				>
-					▶ Run selected {studio.selected.size}
+					▶ Run selected {studioStore.selected.size}
 				</Button>
 			</ToolbarActions>
 		</Container>
 	);
-}
+});

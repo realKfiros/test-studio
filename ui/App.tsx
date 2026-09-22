@@ -1,8 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { TextInput, useWindowDimensions } from "react-native";
 import styled, { ThemeProvider } from "styled-components/native";
 import { theme } from "./theme";
-import { useStudio } from "./useStudio";
+import { observer } from "mobx-react-lite";
+import studioStore from "./stores";
+import { usePageTitle } from "./hooks/usePageTitle";
 import { useSearchShortcut } from "./hooks/useSearchShortcut";
 import { Sidebar } from "./components/Sidebar";
 import { Toolbar } from "./components/Toolbar";
@@ -56,50 +58,52 @@ const Footer = styled(Caption)`
 	font-size: 9px;
 `;
 
-export default function App() {
-	const studio = useStudio();
+const App = observer(function App() {
+	useEffect(() => {
+		studioStore.connect();
+		return studioStore.disconnect;
+	}, []);
+	usePageTitle(studioStore.catalog?.name);
 	const { width, height } = useWindowDimensions();
-	const [settingsOpen, setSettingsOpen] = useState(false);
 	const searchRef = useRef<TextInput>(null);
-	useSearchShortcut(searchRef, !settingsOpen);
+	useSearchShortcut(searchRef, !studioStore.settingsOpen);
 	const mobile = width <= 600;
-	const notice = [studio.error, ...(studio.catalog?.warnings ?? [])].filter(Boolean).join("\n");
 	return (
 		<ThemeProvider theme={theme}>
 			<Shell>
-				<Sidebar studio={studio} />
+				<Sidebar />
 				<PageScroll>
 					<Main
 						$mobile={mobile}
 						$height={height}
 						$padding={width <= 800 ? 16 : width <= 1100 ? 22 : 36}
 					>
-						<Toolbar studio={studio} onOpenSettings={() => setSettingsOpen(true)} />
-						<DiscoverySummary catalog={studio.catalog} />
-						{!!notice && <Notice accessibilityRole="alert">{notice}</Notice>}
+						<Toolbar />
+						<DiscoverySummary catalog={studioStore.catalog} />
+						{!!studioStore.notice && (
+							<Notice accessibilityRole="alert">{studioStore.notice}</Notice>
+						)}
 						<StudioPanel $mobile={mobile}>
-							<CatalogPanel studio={studio} searchRef={searchRef} />
+							<CatalogPanel searchRef={searchRef} />
 							<Inspector $mobile={mobile}>
-								{studio.view === "run" ? (
-									<RunInspector studio={studio} />
-								) : studio.view === "history" ? (
-									<RunHistory studio={studio} />
+								{studioStore.view === "run" ? (
+									<RunInspector />
+								) : studioStore.view === "history" ? (
+									<RunHistory />
 								) : (
-									<FileInspector studio={studio} />
+									<FileInspector />
 								)}
 							</Inspector>
 						</StudioPanel>
 						<Footer>
-							Detected: {studio.catalog?.libraries.join(" · ") || "none yet"}
+							Detected: {studioStore.catalog?.libraries.join(" · ") || "none yet"}
 						</Footer>
 					</Main>
 				</PageScroll>
-				<SettingsDialog
-					studio={studio}
-					open={settingsOpen}
-					onClose={() => setSettingsOpen(false)}
-				/>
+				<SettingsDialog />
 			</Shell>
 		</ThemeProvider>
 	);
-}
+});
+
+export default App;

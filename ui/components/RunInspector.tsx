@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import styled from "styled-components/native";
-import type { Studio } from "../useStudio";
+import { observer } from "mobx-react-lite";
+import studioStore from "../stores";
 import { duration, runName } from "../model";
 import { Caption, BodyText, MonoText, StatusText } from "../styles/typography";
 import { Actions } from "../styles/layout";
@@ -91,11 +92,11 @@ const ArtifactPath = styled(Caption)`
 	font-size: 9px;
 `;
 
-export function RunInspector({ studio }: { studio: Studio }) {
-	const run = studio.run;
+export const RunInspector = observer(function RunInspector() {
+	const run = studioStore.run;
 	if (!run) return <EmptyState description="Loading run…" />;
 	const job =
-		run.jobs.find((job) => job.id === studio.jobId) ??
+		run.jobs.find((job) => job.id === studioStore.jobId) ??
 		run.jobs.find((job) => job.status === "running") ??
 		run.jobs[0];
 	if (!job) return <EmptyState description="No files in this run." />;
@@ -107,7 +108,7 @@ export function RunInspector({ studio }: { studio: Studio }) {
 		<>
 			<InspectorHeading>
 				<BackRow>
-					<Button compact variant="quiet" onPress={() => studio.setView("file")}>
+					<Button compact variant="quiet" onPress={studioStore.showFiles}>
 						← Back to tests
 					</Button>
 				</BackRow>
@@ -120,16 +121,16 @@ export function RunInspector({ studio }: { studio: Studio }) {
 					<HeadingText>{runName(run)}</HeadingText>
 					<Actions>
 						{!run.finishedAt ? (
-							<Button compact onPress={() => void studio.stop()}>
+							<Button compact onPress={() => void studioStore.stop()}>
 								■ Stop
 							</Button>
 						) : (
 							<>
 								<Button
 									compact
-									disabled={studio.busy}
+									disabled={studioStore.busy}
 									onPress={() =>
-										void studio.start(run.jobs.map((job) => job.selection))
+										void studioStore.start(run.jobs.map((job) => job.selection))
 									}
 								>
 									↻ Rerun
@@ -137,9 +138,11 @@ export function RunInspector({ studio }: { studio: Studio }) {
 								{!!failed.length && (
 									<Button
 										compact
-										disabled={studio.busy}
+										disabled={studioStore.busy}
 										onPress={() =>
-											void studio.start(failed.map((job) => job.selection))
+											void studioStore.start(
+												failed.map((job) => job.selection),
+											)
 										}
 									>
 										Rerun failed
@@ -179,7 +182,7 @@ export function RunInspector({ studio }: { studio: Studio }) {
 						accessibilityLabel={`${item.status} ${item.file.path}`}
 						aria-selected={item.id === job.id}
 						$active={item.id === job.id}
-						onPress={() => studio.setJobId(item.id)}
+						onPress={() => studioStore.selectJob(item.id)}
 					>
 						<StatusText $status={item.status}>{item.status}</StatusText>
 						<JobName numberOfLines={1}>{item.file.path}</JobName>
@@ -236,4 +239,4 @@ export function RunInspector({ studio }: { studio: Studio }) {
 			</Meta>
 		</>
 	);
-}
+});

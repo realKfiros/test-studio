@@ -1,5 +1,6 @@
 import styled from "styled-components/native";
-import type { Studio } from "../useStudio";
+import { observer } from "mobx-react-lite";
+import studioStore from "../stores";
 import { runName } from "../model";
 import { Caption, BodyText, Note } from "../styles/typography";
 import {
@@ -29,12 +30,12 @@ const Name = styled(BodyText)`
 	min-width: 0px;
 `;
 
-export function RunHistory({ studio }: { studio: Studio }) {
+export const RunHistory = observer(function RunHistory() {
 	return (
 		<>
 			<InspectorHeading>
 				<BackRow>
-					<Button compact variant="quiet" onPress={() => studio.setView("file")}>
+					<Button compact variant="quiet" onPress={studioStore.showFiles}>
 						← Back to tests
 					</Button>
 				</BackRow>
@@ -44,22 +45,22 @@ export function RunHistory({ studio }: { studio: Studio }) {
 				<PathText>The last 20 runs in this server session.</PathText>
 			</InspectorHeading>
 			<InspectorContent>
-				{studio.runs.map((run) => (
+				{studioStore.runs.map((run) => (
 					<Entry
 						key={run.id}
 						accessibilityRole="button"
 						accessibilityLabel={`${runName(run)}, ${run.status}, ${new Date(run.startedAt).toLocaleTimeString()}`}
-						onPress={() => studio.openRun(run.id)}
+						onPress={() => studioStore.openRun(run.id)}
 					>
 						<Badge status={run.status}>{run.status}</Badge>
 						<Name numberOfLines={1}>{runName(run)}</Name>
 						<Caption>{new Date(run.startedAt).toLocaleTimeString()}</Caption>
 					</Entry>
 				))}
-				{!studio.runs.length && (
+				{!studioStore.runs.length && (
 					<Note>No runs yet. Select a file or test to get started.</Note>
 				)}
 			</InspectorContent>
 		</>
 	);
-}
+});

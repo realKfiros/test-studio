@@ -1,6 +1,7 @@
 import styled from "styled-components/native";
 import { useWindowDimensions } from "react-native";
-import type { Studio } from "../useStudio";
+import { observer } from "mobx-react-lite";
+import studioStore from "../stores";
 import { runName, workspaceName } from "../model";
 import { BodyText, Caption } from "../styles/typography";
 
@@ -80,17 +81,17 @@ const Connection = styled.View`
 	padding: 24px 8px 0px;
 `;
 
-export function Sidebar({ studio }: { studio: Studio }) {
+export const Sidebar = observer(function Sidebar() {
 	const { width } = useWindowDimensions();
 	const compact = width <= 800;
-	const catalog = studio.catalog;
+	const catalog = studioStore.catalog;
 	const runners = [
 		...new Set([
 			...(catalog?.runners.map((runner) => runner.id) ?? []),
 			...(catalog?.files.map((file) => file.runner) ?? []),
 		]),
 	];
-	const workspaces = [...new Set(catalog?.files.map((file) => file.workspace))].sort();
+	const workspaces = studioStore.workspaces;
 	return (
 		<Container $width={compact ? 62 : width <= 1100 ? 190 : 224}>
 			<Navigation accessibilityLabel="Test navigation">
@@ -104,7 +105,7 @@ export function Sidebar({ studio }: { studio: Studio }) {
 								</ProjectName>
 								<Caption>Local workspace</Caption>
 							</ProjectDetails>
-							<Dot $status={studio.connected ? "passed" : "offline"} />
+							<Dot $status={studioStore.connected ? "passed" : "offline"} />
 						</Project>
 						<Label>EXPLORER</Label>
 					</>
@@ -119,16 +120,10 @@ export function Sidebar({ studio }: { studio: Studio }) {
 							key={id}
 							accessibilityRole="button"
 							accessibilityLabel={label}
-							aria-selected={studio.filters.runner === id}
-							$active={studio.filters.runner === id}
+							aria-selected={studioStore.filters.runner === id}
+							$active={studioStore.filters.runner === id}
 							$compact={compact}
-							onPress={() =>
-								studio.setFilters((filters) => ({
-									...filters,
-									runner: id,
-									workspace: "all",
-								}))
-							}
+							onPress={() => studioStore.setRunner(id)}
 						>
 							<NavIcon>{id === "all" ? "▦" : "◉"}</NavIcon>
 							{!compact && (
@@ -152,16 +147,10 @@ export function Sidebar({ studio }: { studio: Studio }) {
 								key={workspace}
 								accessibilityRole="button"
 								accessibilityLabel={workspaceName(workspace)}
-								aria-selected={studio.filters.workspace === workspace}
-								$active={studio.filters.workspace === workspace}
+								aria-selected={studioStore.filters.workspace === workspace}
+								$active={studioStore.filters.workspace === workspace}
 								$compact={false}
-								onPress={() =>
-									studio.setFilters((filters) => ({
-										...filters,
-										workspace:
-											filters.workspace === workspace ? "all" : workspace,
-									}))
-								}
+								onPress={() => studioStore.toggleWorkspace(workspace)}
 							>
 								<NavIcon>⌑</NavIcon>
 								<NavText numberOfLines={1}>{workspaceName(workspace)}</NavText>
@@ -174,16 +163,18 @@ export function Sidebar({ studio }: { studio: Studio }) {
 								</Count>
 							</NavButton>
 						))}
-						<Label $spaced>RECENT RUNS · {studio.runs.length}</Label>
-						{studio.runs.length ? (
-							studio.runs.map((run) => (
+						<Label $spaced>RECENT RUNS · {studioStore.runs.length}</Label>
+						{studioStore.runs.length ? (
+							studioStore.runs.map((run) => (
 								<NavButton
 									key={run.id}
 									accessibilityRole="button"
 									accessibilityLabel={`${runName(run)}, ${run.status}`}
-									$active={studio.view === "run" && studio.runId === run.id}
+									$active={
+										studioStore.view === "run" && studioStore.runId === run.id
+									}
 									$compact={false}
-									onPress={() => studio.openRun(run.id)}
+									onPress={() => studioStore.openRun(run.id)}
 								>
 									<Dot $status={run.status} />
 									<NavText numberOfLines={1}>{runName(run)}</NavText>
@@ -203,12 +194,14 @@ export function Sidebar({ studio }: { studio: Studio }) {
 			</Navigation>
 			{!compact && (
 				<Connection accessibilityLiveRegion="polite">
-					<Dot $status={studio.connected ? "passed" : "offline"} />
+					<Dot $status={studioStore.connected ? "passed" : "offline"} />
 					<Count>
-						{studio.connected ? "Auto-discovery is on" : "Disconnected · retrying…"}
+						{studioStore.connected
+							? "Auto-discovery is on"
+							: "Disconnected · retrying…"}
 					</Count>
 				</Connection>
 			)}
 		</Container>
 	);
-}
+});

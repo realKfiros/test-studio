@@ -1,5 +1,6 @@
 import styled from "styled-components/native";
-import type { Studio } from "../useStudio";
+import { observer } from "mobx-react-lite";
+import studioStore from "../stores";
 import { BodyText, Note } from "../styles/typography";
 import { Dialog } from "./Dialog";
 import { Button } from "./Button";
@@ -26,25 +27,21 @@ const DoneRow = styled.View`
 	align-items: flex-start;
 `;
 
-export function SettingsDialog({
-	studio,
-	open,
-	onClose,
-}: {
-	studio: Studio;
-	open: boolean;
-	onClose: () => void;
-}) {
+export const SettingsDialog = observer(function SettingsDialog() {
 	return (
-		<Dialog title="Run settings" open={open} onClose={onClose}>
+		<Dialog
+			title="Run settings"
+			open={studioStore.settingsOpen}
+			onClose={studioStore.closeSettings}
+		>
 			<Note>Maestro uses a running simulator or connected device with your app ready.</Note>
 			<Field>
 				<BodyText>Device ID (optional)</BodyText>
 				<Input
 					accessibilityLabel="Device ID (optional)"
 					placeholder="Automatic device selection"
-					value={studio.device}
-					onChangeText={studio.setDevice}
+					value={studioStore.device}
+					onChangeText={studioStore.setDevice}
 					autoCorrect={false}
 					autoCapitalize="none"
 				/>
@@ -54,8 +51,8 @@ export function SettingsDialog({
 				<VariablesInput
 					accessibilityLabel="Flow variables (one NAME=value per line)"
 					placeholder="APP_ID=com.example.app"
-					value={studio.variables}
-					onChangeText={studio.setVariables}
+					value={studioStore.variables}
+					onChangeText={studioStore.setVariables}
 					multiline
 					textAlignVertical="top"
 					autoCorrect={false}
@@ -67,10 +64,10 @@ export function SettingsDialog({
 				Existing shell environment and test configuration are inherited.
 			</Note>
 			<DoneRow>
-				<Button variant="primary" onPress={onClose}>
+				<Button variant="primary" onPress={studioStore.closeSettings}>
 					Done
 				</Button>
 			</DoneRow>
 		</Dialog>
 	);
-}
+});

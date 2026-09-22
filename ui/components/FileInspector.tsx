@@ -1,5 +1,6 @@
 import styled from "styled-components/native";
-import type { Studio } from "../useStudio";
+import { observer } from "mobx-react-lite";
+import studioStore from "../stores";
 import { BodyText, Caption, Note } from "../styles/typography";
 import {
 	InspectorHeading,
@@ -33,16 +34,16 @@ const TabLabel = styled(BodyText)<{ $active: boolean }>`
 	color: ${({ $active, theme }) => ($active ? theme.colors.secondaryText : theme.colors.muted)};
 `;
 
-export function FileInspector({ studio }: { studio: Studio }) {
-	const file = studio.currentFile;
+export const FileInspector = observer(function FileInspector() {
+	const file = studioStore.currentFile;
 	if (!file)
 		return (
 			<EmptyState
-				title={studio.catalog ? "Select a file" : "Discovering your tests"}
+				title={studioStore.catalog ? "Select a file" : "Discovering your tests"}
 				description="Choose a file to inspect its tests, browse the source, or start a run."
 			/>
 		);
-	const runner = studio.catalog?.runners.find((runner) => runner.id === file.runner);
+	const runner = studioStore.catalog?.runners.find((runner) => runner.id === file.runner);
 	return (
 		<>
 			<InspectorHeading>
@@ -59,8 +60,8 @@ export function FileInspector({ studio }: { studio: Studio }) {
 					<HeadingText>{file.name}</HeadingText>
 					<Button
 						compact
-						disabled={!runner?.available || studio.busy}
-						onPress={() => void studio.start([{ fileId: file.id }])}
+						disabled={!runner?.available || studioStore.busy}
+						onPress={() => void studioStore.start([{ fileId: file.id }])}
 					>
 						▶ Run {file.steps ? "flow" : "file"}
 					</Button>
@@ -72,18 +73,18 @@ export function FileInspector({ studio }: { studio: Studio }) {
 					<Tab
 						key={tab}
 						accessibilityRole="tab"
-						aria-selected={studio.tab === tab}
-						$active={studio.tab === tab}
-						onPress={() => studio.setTab(tab)}
+						aria-selected={studioStore.tab === tab}
+						$active={studioStore.tab === tab}
+						onPress={() => studioStore.setTab(tab)}
 					>
-						<TabLabel $active={studio.tab === tab}>
+						<TabLabel $active={studioStore.tab === tab}>
 							{tab === "source" ? "Source" : file.steps ? "Flow steps" : "Tests"}
 						</TabLabel>
 					</Tab>
 				))}
 			</Tabs>
 			<InspectorContent>
-				{studio.tab === "source" ? (
+				{studioStore.tab === "source" ? (
 					<SourceView key={file.id} file={file} />
 				) : (
 					<>
@@ -99,10 +100,10 @@ export function FileInspector({ studio }: { studio: Studio }) {
 								add it to PATH.
 							</Note>
 						) : null}
-						{file.steps ? <FlowSteps file={file} /> : <TestCases studio={studio} />}
+						{file.steps ? <FlowSteps file={file} /> : <TestCases />}
 					</>
 				)}
 			</InspectorContent>
 		</>
 	);
-}
+});

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { observer } from "mobx-react-lite";
 import styled from "styled-components/native";
 import type { TestFile } from "../../types";
-import { api } from "../api";
+import studioStore from "../stores";
 import { MonoText, Note } from "../styles/typography";
 
 const HorizontalScroll = styled.ScrollView`
@@ -24,24 +24,9 @@ const Code = styled(MonoText)`
 	flex-shrink: 0;
 `;
 
-export function SourceView({ file }: { file: TestFile }) {
-	const [source, setSource] = useState<string | null>(null);
-	const [error, setError] = useState("");
-	useEffect(() => {
-		const controller = new AbortController();
-		api<{ source: string }>(
-			`/api/source?id=${encodeURIComponent(file.id)}`,
-			undefined,
-			controller.signal,
-		)
-			.then((result) => {
-				if (!controller.signal.aborted) setSource(result.source);
-			})
-			.catch((cause) => {
-				if (!controller.signal.aborted) setError(cause.message);
-			});
-		return () => controller.abort();
-	}, [file.id]);
+export const SourceView = observer(function SourceView({ file }: { file: TestFile }) {
+	const source = studioStore.source;
+	const error = studioStore.sourceError;
 	if (error) return <Note accessibilityRole="alert">{error}</Note>;
 	if (source === null) return <Note>Loading source…</Note>;
 	return (
@@ -56,4 +41,4 @@ export function SourceView({ file }: { file: TestFile }) {
 			</Lines>
 		</HorizontalScroll>
 	);
-}
+});
