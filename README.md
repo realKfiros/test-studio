@@ -4,6 +4,34 @@ A local test explorer with pluggable adapters. It discovers files and test decla
 
 The executable runs on **Node.js 22+**. Bun is only needed to run Bun tests or the development test suite; Maestro is only needed for Maestro flows. Target projects need their own dependencies installed.
 
+## Quick start
+
+Run from the project you want to explore:
+
+```sh
+npx @kfiros/test-studio
+# or
+bunx @kfiros/test-studio
+```
+
+Pass a path to explore another project, or use `run` for terminal-only execution:
+
+```sh
+npx @kfiros/test-studio /absolute/path/to/project
+bunx @kfiros/test-studio run --runner bun
+npx @kfiros/test-studio init
+```
+
+Both launchers use the package's Node executable, so Node.js 22+ must be installed. No global installation or frontend build is needed. To keep the executable in a project:
+
+```sh
+npm install --save-dev @kfiros/test-studio
+# or
+bun add --dev @kfiros/test-studio
+```
+
+The installed command is `test-studio`; the SDK is imported from `@kfiros/test-studio`.
+
 ## Start from this checkout
 
 ```sh
@@ -34,13 +62,14 @@ The build follows [Expo's web export workflow](https://docs.expo.dev/guides/publ
 
 ## Executable package
 
-The npm package includes a `test-studio` executable, compiled JavaScript, TypeScript declarations, the UI, and a configuration schema. Once published under an available package name, it can be launched with `npx <package-name> [project-path]`, `bunx <package-name>`, or a locally installed `test-studio` command. The final registry name and license are still to be chosen; this repository remains private and unpublished.
+The `@kfiros/test-studio` npm package includes a `test-studio` executable, compiled JavaScript, TypeScript declarations, the UI, and a configuration schema. The UI is already compiled in the package; launching it never starts Expo or Metro.
 
 Try the actual package locally without publishing:
 
 ```sh
 npm pack --pack-destination /tmp
-npx --yes --package /tmp/test-studio-0.1.0.tgz test-studio /absolute/path/to/project
+npx --yes --package /tmp/kfiros-test-studio-0.1.0.tgz test-studio /absolute/path/to/project
+bunx --package /tmp/kfiros-test-studio-0.1.0.tgz test-studio /absolute/path/to/project
 ```
 
 The package does not need Bun to start. Each adapter finds its tool in project-local `node_modules/.bin` directories or on PATH. Missing tools are shown in the UI.
@@ -58,7 +87,7 @@ npm start -- run /absolute/path/to/project --file packages/api --test "creates a
 npm start -- run /absolute/path/to/project --runner maestro --device simulator-id --env MODE=local
 ```
 
-With the executable installed (or through npx after publication):
+With the executable installed:
 
 ```sh
 test-studio run
@@ -127,7 +156,7 @@ All options are optional. The default adapters are `["bun", "maestro"]`; supplyi
 
 `--port` overrides config; port `0` picks a free port. Restart Test Studio after changing configuration or adapter code. The ignore file is reread on each scan. A custom `ignoreFile` path is relative to the project root and must exist; `false` disables it. `name` overrides the project name in the UI, and `timeoutMs` sets each job's time limit.
 
-The published SDK exports `defineConfig`, `defineAdapter`, and their types for editor assistance. Configs can also export plain objects without importing Test Studio. The [JSON schema](schema.json) can be referenced locally as `./node_modules/test-studio/schema.json` when the package is installed.
+The SDK exports `defineConfig`, `defineAdapter`, and their types from `@kfiros/test-studio` for editor assistance. Configs can also export plain objects without importing Test Studio. The [JSON schema](schema.json) can be referenced locally as `./node_modules/@kfiros/test-studio/schema.json` when the package is installed.
 
 ## Ignore rules
 
@@ -175,7 +204,7 @@ bun run test
 npm run test:package
 ```
 
-The integration suite launches real processes against temporary projects and a local HTTP server. It covers built-in and custom adapters, config loading, ignore rules, filtering, failures, zero-result runs, cancellation, timeouts, queue exclusivity, report parsing, and the local API boundary. `test:package` packs and installs the npm artifact into a temporary consumer, then checks npx, config initialization, SDK imports, custom adapter execution in both terminal and UI modes, and UI assets with only Node and system tools on PATH. It may download dependencies during installation.
+The integration suite launches real processes against temporary projects and a local HTTP server. It covers built-in and custom adapters, config loading, ignore rules, filtering, failures, zero-result runs, cancellation, timeouts, queue exclusivity, report parsing, and the local API boundary. `test:package` launches the packed npm artifact through both npx and bunx in an isolated project, then checks config initialization, SDK imports, custom adapter execution in terminal and UI modes, and compiled UI assets with only Node and system tools on PATH. It may download dependencies during installation.
 
 ## Extending
 
@@ -183,6 +212,10 @@ See [Writing adapters](docs/adapters.md) and the runnable [Node checks example](
 
 The CLI loads project config and adapters; discovery walks the project once and asks adapters to inspect candidate files. The runner owns process lifecycle, cancellation, timeouts, and history. Adapters supply literal commands and normalized results, with JUnit as the default report format. The UI is an Expo web app built with TypeScript, React, and styled-components. It reads runner metadata from the same catalog API.
 
-Before release: choose a registry name and license, add CI, and verify Windows process cancellation and executable shims. Nothing is published automatically.
+See [Publishing releases](docs/releases.md) for verification and npm publication. Nothing is published automatically.
 
-Runner references: [Bun reporting](https://bun.sh/docs/test/reporters), [Bun test filtering](https://bun.sh/docs/test), [Maestro CLI options](https://docs.maestro.dev/maestro-cli/maestro-cli-commands-and-options). Packaging follows npm's [executable and files configuration](https://docs.npmjs.com/cli/v8/configuring-npm/package-json/); configuration modules use [jiti](https://github.com/unjs/jiti) and ignore files use [node-ignore](https://github.com/kaelzhang/node-ignore).
+## License
+
+[MIT](LICENSE). The compiled UI includes `dist/web/THIRD_PARTY_NOTICES.txt` with the licenses of its bundled dependencies.
+
+Runner references: [Bun reporting](https://bun.sh/docs/test/reporters), [Bun test filtering](https://bun.sh/docs/test), [Maestro CLI options](https://docs.maestro.dev/maestro-cli/maestro-cli-commands-and-options). Packaging follows npm's [executable and files configuration](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/); configuration modules use [jiti](https://github.com/unjs/jiti) and ignore files use [node-ignore](https://github.com/kaelzhang/node-ignore).

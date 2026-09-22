@@ -44,7 +44,7 @@ test("adds numbers", () => {
 });
 ```
 
-The example uses plain objects, so the project does not need to import or install the SDK merely to load its adapter. For typed adapter development with Test Studio installed, use `defineAdapter` and `Adapter` from `test-studio`.
+The example uses plain objects, so the project does not need to import or install the SDK merely to load its adapter. For typed adapter development with Test Studio installed, use `defineAdapter` and `Adapter` from `@kfiros/test-studio`.
 
 ## Interface
 
