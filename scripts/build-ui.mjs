@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { writeUiLicenses } from "./ui-licenses.mjs";
 
 const app = new URL("../ui/", import.meta.url);
 await rm(new URL("dist/", app), { recursive: true, force: true });
@@ -11,6 +12,7 @@ execFileSync(
 		"export",
 		"--platform",
 		"web",
+		"--source-maps",
 		"--output-dir",
 		"dist",
 	],
@@ -30,3 +32,5 @@ await writeFile(
 		'<meta name="test-studio-token" content="__SESSION_TOKEN__" /><meta name="color-scheme" content="dark" /></head>',
 	),
 );
+
+await writeUiLicenses(fileURLToPath(app), fileURLToPath(new URL("dist/", app)));
