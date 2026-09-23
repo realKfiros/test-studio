@@ -57,6 +57,8 @@ Defaults discover `**/tests/**/*.php`, run from the nearest `composer.json`, and
 
 All paths in `options` are relative to the scanned project root. Omit `binary` to resolve `vendor/bin/pest` from the discovered working directory. Omit `configuration` to use Pest's normal configuration lookup.
 
+Pest streams test start, pass, fail, and skip events into the live output pane. JUnit remains the source for final per-test results. This also works through Docker Compose.
+
 PHP source is parsed without executing it. Static `test()` and `it()` declarations, nested `describe()` blocks, and `->group()` tags are discovered. `it()` names include Pest's `it ` prefix. Groups become file-level tags; a tag filter selects files, not a subset of the tests within them. Dataset, generated, skipped, and duplicate declarations require whole-file runs. Conventional PHPUnit `*Test.php` files are available as whole-file runs too. If parsing fails, the file remains runnable so Pest can report the syntax error.
 
 ## Docker Compose

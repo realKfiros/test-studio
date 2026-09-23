@@ -4,6 +4,7 @@ export type {
 	AdapterFactory,
 	Command,
 	ProcessCommand,
+	OutputFormatter,
 	CommandContext,
 	DiscoveryContext,
 	DiscoveredFile,

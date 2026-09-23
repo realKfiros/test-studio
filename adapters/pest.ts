@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import type { Adapter } from "../adapter.ts";
 import { defineCommandAdapter } from "./command-adapter.ts";
 import { discoverPest } from "./pest-discovery.ts";
+import { createPestOutputFormatter } from "./pest-output.ts";
 
 export type PestOptions = {
 	files?: string[];
@@ -29,6 +30,7 @@ export default function createPestAdapter(options: PestOptions = {}): Adapter {
 	return {
 		...base,
 		supportsIndividualTests: true,
+		createOutputFormatter: createPestOutputFormatter,
 		discover(context) {
 			const metadata = discoverPest(context.source, context.path);
 			return (
@@ -48,6 +50,7 @@ export default function createPestAdapter(options: PestOptions = {}): Adapter {
 				...(options.configuration
 					? ["--configuration", resolve(root, options.configuration)]
 					: []),
+				"--teamcity",
 				"--log-junit",
 				reportPath,
 				resolve(root, file.path),

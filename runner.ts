@@ -165,6 +165,7 @@ export class TestRunner {
 			job.startedAt = Date.now();
 			this.onEvent?.({ type: "job-started", job });
 			const append = (chunk: string) => {
+				if (!chunk) return;
 				// eslint-disable-next-line no-control-regex -- Runner output contains ANSI escape sequences.
 				const text = chunk.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
 				job.output = (job.output + text).slice(-100000);
@@ -192,6 +193,7 @@ export class TestRunner {
 				});
 				validateCommand(command);
 				job.command = displayCommand(command);
+				const formatter = adapter.createOutputFormatter?.();
 				let timedOut = false;
 				for (const [index, step] of [
 					command,
@@ -209,7 +211,11 @@ export class TestRunner {
 					});
 					this.child = child;
 
-					child.stdout!.setEncoding("utf8").on("data", append);
+					child
+						.stdout!.setEncoding("utf8")
+						.on("data", (chunk: string) =>
+							append(index === 0 && formatter ? formatter.write(chunk) : chunk),
+						);
 					child.stderr!.setEncoding("utf8").on("data", append);
 					let killTimer: ReturnType<typeof setTimeout> | undefined;
 					const signal = (name: NodeJS.Signals) => {
@@ -253,6 +259,7 @@ export class TestRunner {
 						}
 						this.child = undefined;
 						this.stopChild = undefined;
+						if (index === 0 && formatter) append(formatter.end());
 					}
 				}
 				try {

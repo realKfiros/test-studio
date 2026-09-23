@@ -43,6 +43,11 @@ export type ResultContext = {
 	output: string;
 	exitCode: number | null;
 };
+/** A fresh formatter is created for each job so chunk boundaries and run state stay isolated. */
+export type OutputFormatter = {
+	write(chunk: string): string;
+	end(): string;
+};
 /** Adapters discover source without executing it and return literal process arguments. */
 export interface Adapter {
 	id: string;
@@ -52,6 +57,8 @@ export interface Adapter {
 	match(path: string): boolean;
 	discover(context: DiscoveryContext): DiscoveredFile | null | Promise<DiscoveredFile | null>;
 	command(context: CommandContext): Command;
+	/** Optionally format stdout as it arrives; stderr and report collection remain unchanged. */
+	createOutputFormatter?(): OutputFormatter;
 	/** Defaults to reading reportPath as JUnit XML. Empty results never count as a pass. */
 	parseResults?(context: ResultContext): Result[] | Promise<Result[]>;
 }

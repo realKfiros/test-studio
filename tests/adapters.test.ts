@@ -8,6 +8,7 @@ import { defineCommandAdapter } from "../adapters/command-adapter.ts";
 import { withDockerCompose } from "../adapters/docker-compose.ts";
 import { discoverPest } from "../adapters/pest-discovery.ts";
 import createPestAdapter from "../adapters/pest.ts";
+import { createPestOutputFormatter } from "../adapters/pest-output.ts";
 import { TestRunner } from "../runner.ts";
 import type { Adapter } from "../adapter.ts";
 import type { TestFile } from "../types.ts";
@@ -187,6 +188,7 @@ test("Pest config discovers files in PHP packages and builds an exact escaped fi
 		join(root, "backend/vendor/bin/pest"),
 		"--configuration",
 		join(root, "backend/phpunit.xml"),
+		"--teamcity",
 		"--log-junit",
 		"/tmp/report.xml",
 		join(root, discovered.path),
@@ -272,6 +274,45 @@ test("a cancelled test process never starts report collection", async () => {
 	expect(run.status).toBe("cancelled");
 });
 
+test("Pest reports a completed case while the Docker test process is still running", async () => {
+	const root = await fixture({
+		"tests/LiveTest.php": "<?php test('first', fn () => true);",
+		"node_modules/.bin/docker": `#!/usr/bin/env node
+ const fs = require('node:fs');
+ const args = process.argv.slice(2);
+ if (args.includes('cp')) fs.writeFileSync(args.at(-1), ${JSON.stringify(junit)});
+ else if (!args.includes('--teamcity')) setTimeout(() => console.log('all done'), 400);
+ else {
+   console.log("##teamcity[testStarted name='first']");
+   setTimeout(() => {
+     console.log("##teamcity[testFinished name='first' duration='100']");
+     console.log("##teamcity[testStarted name='second']");
+     setTimeout(() => console.log("##teamcity[testFinished name='second' duration='300']"), 350);
+   }, 100);
+ }
+ `,
+	});
+	await chmod(join(root, "node_modules/.bin/docker"), 0o755);
+	const adapter = withDockerCompose(createPestAdapter(), {
+		service: "web",
+		projectRoot: "/app",
+	});
+	const { runner, run } = await execute(root, adapter);
+	const deadline = Date.now() + 1500;
+	while (
+		!run.jobs[0].output.includes("PASS first") &&
+		run.jobs[0].status === "running" &&
+		Date.now() < deadline
+	)
+		await Bun.sleep(10);
+	expect(run.jobs[0].status).toBe("running");
+	expect(run.jobs[0].output).toContain("PASS first");
+	await runner.wait(run);
+	expect(run.status).toBe("passed");
+	expect(run.jobs[0].output).toContain("PASS second");
+	expect(run.jobs[0].output).not.toContain("##teamcity");
+});
+
 test("Docker Compose translates paths and copies reports without a shell or a host PHP requirement", async () => {
 	const root = await fixture({
 		"tests/ExampleTest.php": "<?php test('works', fn () => true);",
@@ -318,4 +359,27 @@ test("Docker Compose translates paths and copies reports without a shell or a ho
 		join(run.artifactDir, "0.xml"),
 	]);
 	expect(run.jobs[0].results[0].name).toBe("copied");
+});
+
+test("Pest live output formats split, escaped, failed, and skipped events", () => {
+	const formatter = createPestOutputFormatter();
+	expect(formatter.write("##teamcity[testStarted name='fails || ")).toBe("");
+	expect(formatter.write("here' flowId='1']\n")).toBe("RUN fails | here\n");
+	expect(
+		formatter.write(
+			"##teamcity[testFailed name='fails || here' message='oops|nmore' flowId='1']\n",
+		),
+	).toBe("FAIL fails | here: oops\n");
+	expect(
+		formatter.write("##teamcity[testFinished name='fails || here' duration='31' flowId='1']\n"),
+	).toBe("");
+	expect(formatter.write("##teamcity[testStarted name='skipped' flowId='1']\n")).toBe(
+		"RUN skipped\n",
+	);
+	expect(
+		formatter.write("##teamcity[testIgnored name='skipped' message='not ready' flowId='1']\n"),
+	).toBe("SKIP skipped: not ready\n");
+	expect(formatter.write("##teamcity[testFinished name='skipped' flowId='1']\n")).toBe("");
+	expect(formatter.write("Tests: 2")).toBe("");
+	expect(formatter.end()).toBe("Tests: 2");
 });
