@@ -85,6 +85,7 @@ test("UI filters combine workspace, platform, runner, and case-insensitive test 
 	expect(filterFiles(data, { ...defaultFilters, query: " SECOND " })).toEqual([file]);
 	expect(
 		filterFiles(data, {
+			...defaultFilters,
 			query: " SMOKE ",
 			workspace: "mobile",
 			runner: "maestro",

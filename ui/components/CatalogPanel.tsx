@@ -1,22 +1,18 @@
 import Search from "lucide-react-native/icons/search";
-import FileCode2 from "lucide-react-native/icons/file-code-corner";
-import ListChecks from "lucide-react-native/icons/list-checks";
 import { Icon } from "./Icon";
-import { Fragment, type RefObject } from "react";
+import { type RefObject } from "react";
 import { TextInput, useWindowDimensions } from "react-native";
 import styled from "styled-components/native";
-import type { TestFile } from "../../types";
 import { observer } from "mobx-react-lite";
 import studioStore from "../stores";
-import { workspaceName } from "../model";
-import { Checkbox } from "./Checkbox";
+import { FileTreeEntry } from "./FileTree";
 import { Select } from "./Select";
 import { Button } from "./Button";
 import { BodyText, Caption, Note } from "../styles/typography";
 
 const Container = styled.View<{ $mobile: boolean; $width: number }>`
 	width: ${({ $mobile, $width }) => ($mobile ? "100%" : `${$width}px`)};
-	${({ $mobile }) => ($mobile ? "height: 300px;" : "")}
+	${({ $mobile }) => ($mobile ? "height: 420px;" : "")}
 	flex-shrink: 0;
 	border-right-width: ${({ $mobile }) => ($mobile ? 0 : 1)}px;
 	border-bottom-width: ${({ $mobile }) => ($mobile ? 1 : 0)}px;
@@ -67,34 +63,9 @@ const List = styled.ScrollView.attrs({
 	flex: 1;
 	min-height: 0px;
 `;
-const Group = styled.View`
-	flex-direction: row;
-	align-items: center;
-	justify-content: space-between;
-	padding: 12px 16px 8px;
-`;
-const FileRow = styled.View<{ $active: boolean }>`
-	flex-direction: row;
-	align-items: center;
-	gap: 4px;
-	padding: 7px 10px;
-	min-height: 48px;
-	border-left-width: 2px;
-	border-left-color: ${({ $active, theme }) => ($active ? theme.colors.accent : "transparent")};
-	background-color: ${({ $active, theme }) => ($active ? theme.colors.selected : "transparent")};
-`;
-const OpenFile = styled.Pressable`
-	flex: 1;
-	min-width: 0px;
-	flex-direction: row;
-	align-items: center;
-	gap: 10px;
-	padding: 3px 4px;
-`;
-const FileInfo = styled.View`
-	flex: 1;
-	min-width: 0px;
-	gap: 3px;
+const TreeControls = styled(Filters)`
+	padding: 0px 8px;
+	margin-top: 0px;
 `;
 const Footer = styled.View`
 	flex-direction: row;
@@ -110,13 +81,7 @@ export const CatalogPanel = observer(function CatalogPanel({
 	searchRef: RefObject<TextInput | null>;
 }) {
 	const { width } = useWindowDimensions();
-	const groups = new Map<string, TestFile[]>();
-	for (const file of studioStore.files) {
-		const group = groups.get(file.workspace);
-		if (group) group.push(file);
-		else groups.set(file.workspace, [file]);
-	}
-	const panelWidth = width > 1100 ? 340 : width > 800 ? 300 : 280;
+	const panelWidth = width > 1100 ? 380 : width > 800 ? 320 : 280;
 	return (
 		<Container $mobile={width <= 600} $width={panelWidth}>
 			<Toolbar>
@@ -145,75 +110,70 @@ export const CatalogPanel = observer(function CatalogPanel({
 						]}
 						onValueChange={studioStore.setPlatform}
 					/>
+					<Select
+						label="Latest result"
+						value={studioStore.filters.status}
+						options={[
+							{ value: "all", label: "All results" },
+							{ value: "unrun", label: "Not run" },
+							{ value: "failed", label: "Failed" },
+							{ value: "passed", label: "Passed" },
+							{ value: "running", label: "Running" },
+							{ value: "queued", label: "Queued" },
+							{ value: "cancelled", label: "Cancelled" },
+						]}
+						onValueChange={studioStore.setStatus}
+					/>
+				</Filters>
+				<Filters>
+					<Select
+						label="Tag"
+						value={studioStore.filters.tag}
+						options={[
+							{ value: "all", label: "All tags" },
+							...studioStore.tags.map((tag) => ({ value: tag, label: tag })),
+						]}
+						onValueChange={studioStore.setTag}
+					/>
+					<Button
+						compact
+						variant="quiet"
+						disabled={!studioStore.hasFilters}
+						onPress={studioStore.resetFilters}
+					>
+						Reset filters
+					</Button>
+				</Filters>
+				<Filters>
 					<Button compact variant="quiet" onPress={studioStore.selectVisible}>
-						Select all
+						Select visible
 					</Button>
 					<Button compact variant="quiet" onPress={studioStore.clearSelection}>
-						Clear
+						Clear selection
 					</Button>
 				</Filters>
 			</Toolbar>
 			<ListHeading>
-				<BodyText>Files</BodyText>
+				<BodyText>Folders & files</BodyText>
 				<Caption>{studioStore.files.length}</Caption>
 			</ListHeading>
+			<TreeControls>
+				<Button compact variant="quiet" onPress={studioStore.expandFolders}>
+					Expand all
+				</Button>
+				<Button compact variant="quiet" onPress={studioStore.collapseFolders}>
+					Collapse all
+				</Button>
+			</TreeControls>
 			<List accessibilityLabel="Discovered test files">
-				{[...groups].map(([workspace, files]) => (
-					<Fragment key={workspace}>
-						<Group>
-							<Caption>{workspaceName(workspace)}</Caption>
-							<Caption>{files.length}</Caption>
-						</Group>
-						{files.map((file) => {
-							const runner = studioStore.catalog?.runners.find(
-								(runner) => runner.id === file.runner,
-							);
-							return (
-								<FileRow
-									key={file.id}
-									$active={studioStore.currentFile?.id === file.id}
-								>
-									<Checkbox
-										label={`Select ${file.name}`}
-										checked={studioStore.selected.has(file.id)}
-										indeterminate={
-											studioStore.selected.get(file.id) instanceof Set
-										}
-										disabled={!runner}
-										onValueChange={(checked) =>
-											studioStore.selectFile(file.id, checked)
-										}
-									/>
-									<OpenFile
-										accessibilityRole="button"
-										accessibilityLabel={`Open ${file.name}`}
-										accessibilityHint={file.path}
-										onPress={() => studioStore.openFile(file.id)}
-									>
-										<Icon
-											icon={file.steps ? ListChecks : FileCode2}
-											size={16}
-										/>
-										<FileInfo>
-											<BodyText numberOfLines={1}>{file.name}</BodyText>
-											<Caption numberOfLines={1}>
-												{file.path.slice(
-													workspace === "." ? 0 : workspace.length + 1,
-												)}
-											</Caption>
-										</FileInfo>
-										<Caption>{file.steps?.length ?? file.cases.length}</Caption>
-									</OpenFile>
-								</FileRow>
-							);
-						})}
-					</Fragment>
+				{studioStore.tree.map((node) => (
+					<FileTreeEntry key={node.path} node={node} />
 				))}
 				{!studioStore.files.length && <Note>No tests match these filters.</Note>}
 			</List>
 			<Footer>
 				<Caption>{studioStore.selected.size} selected</Caption>
-				<Caption>Auto-discovery</Caption>
+				<Caption>Folder actions follow filters</Caption>
 			</Footer>
 		</Container>
 	);

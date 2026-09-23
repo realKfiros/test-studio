@@ -1,5 +1,5 @@
 import { makeAutoObservable, observable, reaction, runInAction } from "mobx";
-import type { Catalog, Run, Selection } from "../../types.ts";
+import type { Catalog, Run, Selection, TestFile } from "../../types.ts";
 import {
 	defaultFilters,
 	filterFiles,
@@ -10,6 +10,7 @@ import {
 	type RunSummary,
 	type Selected,
 } from "../model.ts";
+import { fileTree, inFolder, latestStatuses, selectionState } from "../catalog.ts";
 import { poll } from "./poll.ts";
 
 export type StudioRequest = <T>(path: string, body?: unknown, signal?: AbortSignal) => Promise<T>;
@@ -20,6 +21,7 @@ export class StudioStore {
 	connected = false;
 	error = "";
 	filters = { ...defaultFilters };
+	collapsedFolders = new Set<string>();
 	fileId: string | null = null;
 	selected: Selected = new Map();
 	view: "file" | "history" | "run" = "file";
@@ -66,7 +68,75 @@ export class StudioStore {
 	}
 
 	get files() {
-		return filterFiles(this.catalog, this.filters);
+		return filterFiles(this.catalog, this.filters, this.fileStatuses);
+	}
+
+	get tree() {
+		return fileTree(this.files);
+	}
+	get tags() {
+		return [...new Set(this.catalog?.files.flatMap((file) => file.tags ?? []))].sort();
+	}
+	get fileStatuses() {
+		return latestStatuses(
+			this.view === "run" && this.runDetails
+				? [this.runDetails, ...this.runs.filter((run) => run.id !== this.runDetails?.id)]
+				: this.runs,
+		);
+	}
+	get hasFilters() {
+		return Object.keys(defaultFilters).some(
+			(key) =>
+				this.filters[key as keyof typeof defaultFilters] !==
+				defaultFilters[key as keyof typeof defaultFilters],
+		);
+	}
+	setTag(tag: string) {
+		this.filters.tag = tag;
+	}
+	setStatus(status: string) {
+		this.filters.status = status;
+	}
+	resetFilters() {
+		this.filters = { ...defaultFilters };
+	}
+	toggleFolder(path: string) {
+		if (this.collapsedFolders.has(path)) this.collapsedFolders.delete(path);
+		else this.collapsedFolders.add(path);
+	}
+	expandFolders() {
+		this.collapsedFolders.clear();
+	}
+	collapseFolders() {
+		for (const file of this.files) {
+			const parts = file.path.split("/");
+			for (let i = 1; i < parts.length; i++)
+				this.collapsedFolders.add(parts.slice(0, i).join("/"));
+		}
+	}
+	private folderFiles(path: string): TestFile[] {
+		return this.files.filter(
+			(file) =>
+				inFolder(file, path) &&
+				this.catalog?.runners.some((runner) => runner.id === file.runner),
+		);
+	}
+	folderSelection(path: string) {
+		return selectionState(this.folderFiles(path), this.selected);
+	}
+	folderCount(path: string) {
+		return this.folderFiles(path).length;
+	}
+	selectFolder(path: string, checked: boolean) {
+		const next = new Map(this.selected);
+		for (const file of this.folderFiles(path)) {
+			if (checked) next.set(file.id, null);
+			else next.delete(file.id);
+		}
+		this.selected = next;
+	}
+	startFolder(path: string) {
+		return this.start(this.folderFiles(path).map((file) => ({ fileId: file.id })));
 	}
 
 	get currentFile() {

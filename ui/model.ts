@@ -1,4 +1,4 @@
-import type { Catalog, Job, Run, RunOptions, Selection, TestFile } from "../types.ts";
+import type { Catalog, Job, Run, RunOptions, Selection, Status, TestFile } from "../types.ts";
 
 export type RunSummary = Omit<Run, "jobs"> & {
 	jobs: (Pick<
@@ -10,21 +10,36 @@ export type RunSummary = Omit<Run, "jobs"> & {
 	})[];
 };
 export type Selected = Map<string, Set<string> | null>;
-export type Filters = { runner: string; workspace: string; query: string; platform: string };
+export type Filters = {
+	runner: string;
+	workspace: string;
+	query: string;
+	platform: string;
+	tag: string;
+	status: string;
+};
 export const defaultFilters: Filters = {
 	runner: "all",
 	workspace: "all",
 	query: "",
 	platform: "all",
+	tag: "all",
+	status: "all",
 };
 
-export function filterFiles(catalog: Catalog | null, filters: Filters) {
+export function filterFiles(
+	catalog: Catalog | null,
+	filters: Filters,
+	statuses: Map<string, Status> = new Map(),
+) {
 	const query = filters.query.trim().toLowerCase();
 	return (catalog?.files ?? []).filter(
 		(file) =>
 			(filters.runner === "all" || file.runner === filters.runner) &&
 			(filters.workspace === "all" || file.workspace === filters.workspace) &&
 			(filters.platform === "all" || file.platform === filters.platform) &&
+			(filters.tag === "all" || file.tags?.includes(filters.tag)) &&
+			(filters.status === "all" || (statuses.get(file.id) ?? "unrun") === filters.status) &&
 			(!query ||
 				[
 					file.path,

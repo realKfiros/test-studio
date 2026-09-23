@@ -49,7 +49,7 @@ afterEach(() => {
 async function flush() {
 	for (let i = 0; i < 10; i++) await Promise.resolve();
 }
-function harness() {
+function harness(data: Catalog = catalog) {
 	type Request = {
 		path: string;
 		body?: unknown;
@@ -80,7 +80,7 @@ function harness() {
 	};
 	const connect = async () => {
 		store.connect();
-		take("/api/catalog").resolve(catalog);
+		take("/api/catalog").resolve(data);
 		take("/api/runs").resolve([]);
 		await flush();
 	};
@@ -253,4 +253,47 @@ test("disposing a poll prevents a late response from scheduling another request"
 	complete(1);
 	await new Promise((resolve) => setTimeout(resolve, 15));
 	expect(calls).toBe(1);
+});
+
+test("folder actions respect filters, partial selections, descendants, and neighboring folders", async () => {
+	const paths = [
+		"tests/api/one.test.ts",
+		"tests/api/nested/two.test.ts",
+		"tests/api-extra/three.test.ts",
+		"tests/api/unknown.test.ts",
+	];
+	const nested = paths.map((path, index) => ({
+		...files[0],
+		id: path,
+		path,
+		runner: index === 3 ? "unknown" : "bun",
+		tags: [index === 1 ? "slow" : "fast"],
+	}));
+	const { store, connect, take } = harness({ ...catalog, files: nested });
+	await connect();
+	store.selectFolder("tests/api", true);
+	expect(selectionsFor(store.selected)).toEqual(
+		nested.slice(0, 2).map((file) => ({ fileId: file.id })),
+	);
+	expect(store.folderSelection("tests/api")).toEqual({ checked: true, indeterminate: false });
+	store.openFile(nested[0].id);
+	store.selectCase("one", false);
+	expect(store.folderSelection("tests/api")).toEqual({ checked: false, indeterminate: true });
+	store.setTag("fast");
+	store.selectFolder("tests/api", false);
+	expect(selectionsFor(store.selected)).toEqual([{ fileId: nested[1].id }]);
+	const starting = store.startFolder("tests/api");
+	const request = take("/api/run");
+	expect(request.body).toEqual({
+		selections: [{ fileId: nested[0].id }],
+		options: { device: undefined, env: {} },
+	});
+	request.reject(new Error("test request complete"));
+	await starting;
+	store.collapseFolders();
+	expect(store.collapsedFolders.has("tests/api")).toBe(true);
+	store.expandFolders();
+	expect(store.collapsedFolders.size).toBe(0);
+	store.resetFilters();
+	expect(store.hasFilters).toBe(false);
 });
