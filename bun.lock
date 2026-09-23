@@ -8,6 +8,7 @@
         "fast-xml-parser": "^5.7.3",
         "ignore": "^7.0.9",
         "jiti": "^2.7.0",
+        "php-parser": "^3.7.0",
         "typescript": "^6.0.2",
         "which": "^5.0.0",
         "yaml": "^2.8.3",
@@ -879,6 +880,8 @@
     "path-parse": ["path-parse@1.0.7", "", {}, "sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw=="],
 
     "path-scurry": ["path-scurry@2.0.2", "", { "dependencies": { "lru-cache": "^11.0.0", "minipass": "^7.1.2" } }, "sha512-3O/iVVsJAPsOnpwWIeD+d6z/7PmqApyQePUtCndjatj/9I5LylHvt5qluFaBT3I5h3r1ejfR056c+FCv+NnNXg=="],
+
+    "php-parser": ["php-parser@3.7.0", "", {}, "sha512-JRc1t78GZAEa+MuzVC5A5RJS1NDFTS4UnprUEu/NnsN9cyHbGZLUqghO9IQZUSCay62HYQiWd3PxyWAEF45zmA=="],
 
     "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
 

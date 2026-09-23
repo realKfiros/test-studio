@@ -20,11 +20,15 @@ export type DiscoveryContext = {
 export type DiscoveredFile = Partial<
 	Pick<TestFile, "name" | "cwd" | "cases" | "platform" | "appId" | "tags" | "steps" | "note">
 >;
-export type Command = {
+export type ProcessCommand = {
 	executable: string;
 	args: string[];
 	cwd: string;
 	env?: Record<string, string>;
+};
+export type Command = ProcessCommand & {
+	/** Runs after the test process, including failed tests, within the same timeout and cancellation scope. */
+	collectReport?: ProcessCommand;
 };
 export type CommandContext = {
 	root: string;

@@ -191,55 +191,69 @@ export class TestRunner {
 					options,
 				});
 				validateCommand(command);
-				const executable = executablePath(command.executable, command.cwd);
-				if (!executable) throw new Error(`Executable not found: ${command.executable}`);
 				job.command = displayCommand(command);
-				// Never invoke a shell: paths, device IDs, and environment values are literal arguments.
-				const child = spawn(executable, command.args, {
-					cwd: command.cwd,
-					env: { ...process.env, ...command.env, FORCE_COLOR: "0", NO_COLOR: "1" },
-					stdio: ["ignore", "pipe", "pipe"],
-					detached: process.platform !== "win32",
-				});
-				this.child = child;
-
-				child.stdout!.setEncoding("utf8").on("data", append);
-				child.stderr!.setEncoding("utf8").on("data", append);
-				let killTimer: ReturnType<typeof setTimeout> | undefined;
-				const signal = (name: NodeJS.Signals) => {
-					try {
-						if (child.pid && process.platform !== "win32")
-							process.kill(-child.pid, name);
-						else child.kill(name);
-					} catch {
-						// The process may have exited before the signal was delivered.
-					}
-				};
-				this.stopChild = () => {
-					signal("SIGTERM");
-					killTimer ??= setTimeout(() => signal("SIGKILL"), 1500);
-				};
 				let timedOut = false;
-				const timeout = setTimeout(() => {
-					timedOut = true;
-					append(`\nTest Studio: job exceeded its ${this.timeoutMs} ms limit.\n`);
-					this.stopChild?.();
-				}, this.timeoutMs);
-				// A stop may arrive while realpath is awaiting.
-				if (cancelled()) this.stopChild();
-				try {
-					job.exitCode = await new Promise<number | null>((resolve, reject) => {
-						child.once("error", reject);
-						child.once("close", (code) => resolve(code));
+				for (const [index, step] of [
+					command,
+					...(command.collectReport ? [command.collectReport] : []),
+				].entries()) {
+					if (cancelled() || timedOut) break;
+					const executable = executablePath(step.executable, step.cwd);
+					if (!executable) throw new Error(`Executable not found: ${step.executable}`);
+					// Never invoke a shell: paths, device IDs, and environment values are literal arguments.
+					const child = spawn(executable, step.args, {
+						cwd: step.cwd,
+						env: { ...process.env, ...step.env, FORCE_COLOR: "0", NO_COLOR: "1" },
+						stdio: ["ignore", "pipe", "pipe"],
+						detached: process.platform !== "win32",
 					});
-				} finally {
-					clearTimeout(timeout);
-					if (killTimer) {
-						clearTimeout(killTimer);
-						signal("SIGKILL");
+					this.child = child;
+
+					child.stdout!.setEncoding("utf8").on("data", append);
+					child.stderr!.setEncoding("utf8").on("data", append);
+					let killTimer: ReturnType<typeof setTimeout> | undefined;
+					const signal = (name: NodeJS.Signals) => {
+						try {
+							if (child.pid && process.platform !== "win32")
+								process.kill(-child.pid, name);
+							else child.kill(name);
+						} catch {
+							// The process may have exited before the signal was delivered.
+						}
+					};
+					this.stopChild = () => {
+						signal("SIGTERM");
+						killTimer ??= setTimeout(() => signal("SIGKILL"), 1500);
+					};
+					const timeout = setTimeout(
+						() => {
+							timedOut = true;
+							append(`\nTest Studio: job exceeded its ${this.timeoutMs} ms limit.\n`);
+							this.stopChild?.();
+						},
+						Math.max(1, this.timeoutMs - (Date.now() - job.startedAt!)),
+					);
+					// A stop may arrive while realpath is awaiting.
+					if (cancelled()) this.stopChild();
+					try {
+						const exitCode = await new Promise<number | null>((resolve, reject) => {
+							child.once("error", reject);
+							child.once("close", (code) => resolve(code));
+						});
+						if (index === 0) job.exitCode = exitCode;
+						else if (exitCode !== 0 && !cancelled() && !timedOut)
+							throw new Error(
+								"Unable to collect the test report. See process output.",
+							);
+					} finally {
+						clearTimeout(timeout);
+						if (killTimer) {
+							clearTimeout(killTimer);
+							signal("SIGKILL");
+						}
+						this.child = undefined;
+						this.stopChild = undefined;
 					}
-					this.child = undefined;
-					this.stopChild = undefined;
 				}
 				try {
 					job.results = adapter.parseResults
@@ -308,6 +322,7 @@ export class TestRunner {
 }
 
 function validateCommand(command: Command) {
+	if (command?.collectReport) validateCommand(command.collectReport);
 	if (
 		!command ||
 		typeof command.executable !== "string" ||

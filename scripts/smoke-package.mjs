@@ -132,7 +132,7 @@ try {
 		);
 	await writeFile(
 		join(consumer, "sdk-check.ts"),
-		`import { defineAdapter, defineConfig, type Adapter } from ${JSON.stringify(manifest.name)};
+		`import { defineAdapter, defineConfig, defineCommandAdapter, withDockerCompose, createPestAdapter, type Adapter } from ${JSON.stringify(manifest.name)};
 const adapter: Adapter = defineAdapter({
  id: 'typed', label: 'Typed adapter', executable: 'node',
  match: path => path.endsWith('.check'),
@@ -140,7 +140,10 @@ const adapter: Adapter = defineAdapter({
  command: ({root}) => ({executable: 'node', args: [], cwd: root}),
 });
 const config = defineConfig({adapters: ['bun', 'maestro']});
-void adapter; void config;`,
+const command = defineCommandAdapter({id: 'checks', files: ['**/*.check'], executable: 'node', args: ['{file}']});
+const pest = withDockerCompose(createPestAdapter({files: ['tests/**/*.php']}), {service: 'php', projectRoot: '/app'});
+const inline = defineConfig({adapters: [{id: 'custom', files: ['**/*.check'], executable: 'node', args: ['{file}']}, {use: 'pest', options: {cwd: '.'}, docker: {service: 'php', projectRoot: '/app'}}]});
+void adapter; void config; void command; void pest; void inline;`,
 	);
 	execFileSync(
 		process.execPath,

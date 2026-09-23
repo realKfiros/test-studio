@@ -3,8 +3,14 @@ import { dirname, join, resolve } from "node:path";
 import { createJiti } from "jiti";
 import { adapters as builtins } from "./adapters.ts";
 import type { Adapter, AdapterFactory } from "./adapter.ts";
+import { defineCommandAdapter, type CommandAdapterOptions } from "./adapters/command-adapter.ts";
+import { withDockerCompose, type DockerComposeOptions } from "./adapters/docker-compose.ts";
+import createPestAdapter from "./adapters/pest.ts";
 
-export type AdapterEntry = string | { use: string; options?: Record<string, unknown> };
+export type AdapterEntry =
+	| string
+	| { use: string; options?: Record<string, unknown>; docker?: DockerComposeOptions }
+	| (CommandAdapterOptions & { docker?: DockerComposeOptions });
 export type TestStudioConfig = {
 	$schema?: string;
 	name?: string;
@@ -88,14 +94,36 @@ function validateConfig(value: unknown): ResolvedConfig {
 		if (!Array.isArray(value.adapters)) throw new Error("adapters must be an array.");
 		for (const entry of value.adapters) {
 			if (typeof entry === "string" && entry) continue;
-			if (
-				!isRecord(entry) ||
-				typeof entry.use !== "string" ||
-				!entry.use ||
-				(entry.options !== undefined && !isRecord(entry.options)) ||
-				Object.keys(entry).some((key) => !["use", "options"].includes(key))
-			)
-				throw new Error("Each adapter must be a module name/path or { use, options }.");
+			if (!isRecord(entry))
+				throw new Error(
+					"Each adapter must be a module name/path, { use, options }, or a command definition.",
+				);
+			if ("use" in entry) {
+				if (
+					typeof entry.use !== "string" ||
+					!entry.use ||
+					(entry.options !== undefined && !isRecord(entry.options)) ||
+					Object.keys(entry).some((key) => !["use", "options", "docker"].includes(key))
+				)
+					throw new Error("Adapter references accept use, options, and docker.");
+			} else {
+				if (
+					Object.keys(entry).some(
+						(key) =>
+							![
+								"id",
+								"label",
+								"files",
+								"executable",
+								"args",
+								"cwd",
+								"docker",
+							].includes(key),
+					)
+				)
+					throw new Error("Unknown command adapter option.");
+				defineCommandAdapter(entry as CommandAdapterOptions);
+			}
 		}
 	}
 	return {
@@ -169,28 +197,41 @@ export async function loadProject(rootInput: string, configFile?: string): Promi
 	}
 	const adapters: Adapter[] = [];
 	for (const entry of config.adapters) {
-		const { use, options = {} } = typeof entry === "string" ? { use: entry } : entry;
+		const reference = typeof entry === "string" ? { use: entry } : entry;
+		const name = "use" in reference ? reference.use : reference.id;
 		try {
-			let adapter: unknown = builtins.find((adapter) => adapter.id === use);
-			if (adapter && Object.keys(options).length)
-				throw new Error("Built-in adapters do not accept options yet.");
-			if (!adapter) {
-				const specifier = use.startsWith(".")
-					? resolve(configPath ? dirname(configPath) : root, use)
-					: use;
-				const exported = await loader.import<Adapter | AdapterFactory>(specifier, {
-					default: true,
-				});
-				adapter = typeof exported === "function" ? await exported(options) : exported;
-				if (typeof exported !== "function" && Object.keys(options).length)
-					throw new Error("Adapter options require a factory export.");
-			}
+			let adapter: unknown;
+			if ("use" in reference) {
+				const { use, options = {} } = reference;
+				adapter =
+					use === "pest"
+						? createPestAdapter(options)
+						: builtins.find((adapter) => adapter.id === use);
+				if (adapter && use !== "pest" && Object.keys(options).length)
+					throw new Error("This built-in adapter does not accept options yet.");
+				if (!adapter) {
+					const specifier = use.startsWith(".")
+						? resolve(configPath ? dirname(configPath) : root, use)
+						: use;
+					const exported = await loader.import<
+						Adapter | AdapterFactory | CommandAdapterOptions
+					>(specifier, { default: true });
+					adapter = typeof exported === "function" ? await exported(options) : exported;
+					if (typeof exported !== "function" && Object.keys(options).length)
+						throw new Error("Adapter options require a factory export.");
+				}
+			} else adapter = reference;
+			if (isRecord(adapter) && "files" in adapter && typeof adapter.match !== "function")
+				adapter = defineCommandAdapter(adapter as CommandAdapterOptions);
+			validateAdapter(adapter);
+			if (reference.docker !== undefined)
+				adapter = withDockerCompose(adapter, reference.docker);
 			validateAdapter(adapter);
 			if (adapters.some((existing) => existing.id === adapter.id))
 				throw new Error(`Duplicate adapter id: ${adapter.id}`);
 			adapters.push(adapter);
 		} catch (cause) {
-			throw new Error(`Unable to load adapter "${use}": ${(cause as Error).message}`, {
+			throw new Error(`Unable to load adapter "${name}": ${(cause as Error).message}`, {
 				cause,
 			});
 		}
