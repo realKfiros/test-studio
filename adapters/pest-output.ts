@@ -1,4 +1,5 @@
 import type { OutputFormatter } from "../adapter.ts";
+import type { Result } from "../types.ts";
 
 function decode(value: string): string {
 	return value.replace(/\|(0x[0-9a-fA-F]{4}|.)/g, (_, escaped: string) => {
@@ -17,8 +18,25 @@ function attributes(source: string): Record<string, string> {
 /** Turn Pest's live TeamCity events into readable output without waiting for JUnit. */
 export function createPestOutputFormatter(): OutputFormatter {
 	let pending = "";
-	const failed = new Set<string>();
-	const skipped = new Set<string>();
+	const results: Result[] = [];
+	const active = new Map<string, Result>();
+	function record(
+		key: string,
+		name: string | undefined,
+		status: Result["status"],
+		message?: string,
+	) {
+		if (!name) return;
+		const result = active.get(key);
+		if (result) {
+			result.status = status;
+			result.message = message;
+			return;
+		}
+		const next: Result = { name, status, duration: 0, ...(message ? { message } : {}) };
+		results.push(next);
+		active.set(key, next);
+	}
 	function format(line: string, terminated = true): string {
 		const text = line.endsWith("\r") ? line.slice(0, -1) : line;
 		const event = /^##teamcity\[([A-Za-z]+)(?:\s(.*))?\]$/.exec(text);
@@ -28,18 +46,28 @@ export function createPestOutputFormatter(): OutputFormatter {
 		const key = `${values.flowId ?? ""}\0${name}`;
 		switch (event[1]) {
 			case "testStarted":
+				active.delete(key);
 				return name ? `RUN ${name}\n` : "";
 			case "testFailed":
-				failed.add(key);
+				record(key, name, "failed", values.message);
 				return `FAIL ${name ?? "test"}${values.message ? `: ${values.message.split("\n")[0]}` : ""}\n`;
 			case "testIgnored":
-				skipped.add(key);
+				record(key, name, "skipped", values.message);
 				return `SKIP ${name ?? "test"}${values.message ? `: ${values.message.split("\n")[0]}` : ""}\n`;
-			case "testFinished":
-				if (failed.delete(key) || skipped.delete(key)) return "";
+			case "testFinished": {
+				const result = active.get(key);
+				active.delete(key);
+				const elapsed = Number(values.duration);
+				const duration = Number.isFinite(elapsed) && elapsed >= 0 ? elapsed : 0;
+				if (result) {
+					result.duration = duration;
+					return "";
+				}
+				if (name) results.push({ name, status: "passed", duration });
 				return name
 					? `PASS ${name}${values.duration ? ` (${values.duration} ms)` : ""}\n`
 					: "";
+			}
 			case "testStdOut":
 			case "testStdErr": {
 				const output = values.out ?? "";
@@ -54,6 +82,7 @@ export function createPestOutputFormatter(): OutputFormatter {
 		}
 	}
 	return {
+		results,
 		write(chunk) {
 			pending += chunk;
 			let output = "";

@@ -241,6 +241,20 @@ test("report collection preserves the test exit code and treats collection failu
 	}
 });
 
+test("provisional Pest results do not replace a missing final report", async () => {
+	const root = await fixture({ "example.check": "" });
+	const adapter = collectingAdapter(
+		`console.log("##teamcity[testFinished name='live' duration='10']")`,
+		"process.exit(2)",
+	);
+	adapter.createOutputFormatter = createPestOutputFormatter;
+	const { runner, run } = await execute(root, adapter);
+	await runner.wait(run);
+	expect(run.jobs[0].output).toContain("PASS live");
+	expect(run.status).toBe("failed");
+	expect(run.jobs[0].results).toEqual([]);
+});
+
 test("collection is included in cancellation and the job's total timeout", async () => {
 	const root = await fixture({ "example.check": "" });
 	const adapter = collectingAdapter("", "console.log('collecting'); setInterval(() => {}, 1000)");
@@ -287,7 +301,12 @@ test("Pest reports a completed case while the Docker test process is still runni
    setTimeout(() => {
      console.log("##teamcity[testFinished name='first' duration='100']");
      console.log("##teamcity[testStarted name='second']");
-     setTimeout(() => console.log("##teamcity[testFinished name='second' duration='300']"), 350);
+     console.log("##teamcity[testFailed name='second' message='broken']");
+     console.log("##teamcity[testFinished name='second' duration='200']");
+     console.log("##teamcity[testStarted name='third']");
+     console.log("##teamcity[testIgnored name='third' message='not ready']");
+     console.log("##teamcity[testFinished name='third' duration='0']");
+     setTimeout(() => console.log('all done'), 350);
    }, 100);
  }
  `,
@@ -300,17 +319,24 @@ test("Pest reports a completed case while the Docker test process is still runni
 	const { runner, run } = await execute(root, adapter);
 	const deadline = Date.now() + 1500;
 	while (
-		!run.jobs[0].output.includes("PASS first") &&
+		!run.jobs[0].output.includes("SKIP third") &&
 		run.jobs[0].status === "running" &&
 		Date.now() < deadline
 	)
 		await Bun.sleep(10);
 	expect(run.jobs[0].status).toBe("running");
 	expect(run.jobs[0].output).toContain("PASS first");
+	expect(run.jobs[0].results).toEqual([
+		{ name: "first", status: "passed", duration: 100 },
+		{ name: "second", status: "failed", duration: 200, message: "broken" },
+		{ name: "third", status: "skipped", duration: 0, message: "not ready" },
+	]);
 	await runner.wait(run);
 	expect(run.status).toBe("passed");
-	expect(run.jobs[0].output).toContain("PASS second");
+	expect(run.jobs[0].output).toContain("FAIL second");
+	expect(run.jobs[0].output).toContain("SKIP third");
 	expect(run.jobs[0].output).not.toContain("##teamcity");
+	expect(run.jobs[0].results[0].name).toBe("copied");
 });
 
 test("Docker Compose translates paths and copies reports without a shell or a host PHP requirement", async () => {
@@ -370,6 +396,9 @@ test("Pest live output formats split, escaped, failed, and skipped events", () =
 			"##teamcity[testFailed name='fails || here' message='oops|nmore' flowId='1']\n",
 		),
 	).toBe("FAIL fails | here: oops\n");
+	expect(formatter.results).toEqual([
+		{ name: "fails | here", status: "failed", duration: 0, message: "oops\nmore" },
+	]);
 	expect(
 		formatter.write("##teamcity[testFinished name='fails || here' duration='31' flowId='1']\n"),
 	).toBe("");
@@ -380,6 +409,10 @@ test("Pest live output formats split, escaped, failed, and skipped events", () =
 		formatter.write("##teamcity[testIgnored name='skipped' message='not ready' flowId='1']\n"),
 	).toBe("SKIP skipped: not ready\n");
 	expect(formatter.write("##teamcity[testFinished name='skipped' flowId='1']\n")).toBe("");
+	expect(formatter.results).toEqual([
+		{ name: "fails | here", status: "failed", duration: 31, message: "oops\nmore" },
+		{ name: "skipped", status: "skipped", duration: 0, message: "not ready" },
+	]);
 	expect(formatter.write("Tests: 2")).toBe("");
 	expect(formatter.end()).toBe("Tests: 2");
 });

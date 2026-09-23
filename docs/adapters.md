@@ -57,7 +57,7 @@ Defaults discover `**/tests/**/*.php`, run from the nearest `composer.json`, and
 
 All paths in `options` are relative to the scanned project root. Omit `binary` to resolve `vendor/bin/pest` from the discovered working directory. Omit `configuration` to use Pest's normal configuration lookup.
 
-Pest streams test start, pass, fail, and skip events into the live output pane. JUnit remains the source for final per-test results. This also works through Docker Compose.
+Pest streams test start, pass, fail, and skip events into the live output pane. Passed, failed, and skipped counts update as those events arrive. The final JUnit report replaces these provisional results. This also works through Docker Compose.
 
 PHP source is parsed without executing it. Static `test()` and `it()` declarations, nested `describe()` blocks, and `->group()` tags are discovered. `it()` names include Pest's `it ` prefix. Groups become file-level tags; a tag filter selects files, not a subset of the tests within them. Dataset, generated, skipped, and duplicate declarations require whole-file runs. Conventional PHPUnit `*Test.php` files are available as whole-file runs too. If parsing fails, the file remains runnable so Pest can report the syntax error.
 
@@ -133,15 +133,16 @@ The example uses plain objects, so the project does not need to import or instal
 
 ## Interface
 
-| Member                    | Purpose                                                                                                      |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `id`, `label`             | Stable framework identifier and UI label.                                                                    |
-| `executable`              | Tool checked for availability in project-local `.bin` directories and PATH.                                  |
-| `supportsIndividualTests` | Enables individual case controls; defaults to false.                                                         |
-| `match(path)`             | Cheap synchronous candidate check on a project-relative path with forward slashes.                           |
-| `discover(context)`       | Inspect source and return file metadata, or null if it is not this framework. May be async.                  |
-| `command(context)`        | Synchronously return `{ executable, args, cwd, env?, collectReport? }`. Never use a shell command string.    |
-| `parseResults(context)`   | Optionally return normalized results, asynchronously if needed. Defaults to reading JUnit from `reportPath`. |
+| Member                    | Purpose                                                                                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`, `label`             | Stable framework identifier and UI label.                                                                                                                                                               |
+| `executable`              | Tool checked for availability in project-local `.bin` directories and PATH.                                                                                                                             |
+| `supportsIndividualTests` | Enables individual case controls; defaults to false.                                                                                                                                                    |
+| `match(path)`             | Cheap synchronous candidate check on a project-relative path with forward slashes.                                                                                                                      |
+| `discover(context)`       | Inspect source and return file metadata, or null if it is not this framework. May be async.                                                                                                             |
+| `command(context)`        | Synchronously return `{ executable, args, cwd, env?, collectReport? }`. Never use a shell command string.                                                                                               |
+| `createOutputFormatter()` | Optionally return a fresh `{ write(chunk), end(), results? }` formatter for each job's stdout. `results` is an optional mutable array of provisional test results; the final parsed report replaces it. |
+| `parseResults(context)`   | Optionally return normalized results, asynchronously if needed. Defaults to reading JUnit from `reportPath`.                                                                                            |
 
 `discover` receives `root` (absolute), `path` (project relative), source text, the nearest package's manifest and workspace, and `nearestConfig(filename)`. That helper returns the project-relative nearest directory containing a configuration file, or `.`. Discovery must read source without executing tests or hooks. It returns optional `name`, `cwd`, `cases`, `steps`, `tags`, `platform`, `appId`, and `note`. The scanner owns file IDs, paths, and the adapter ID. `cwd` defaults to the nearest package directory and is relative to the project root. Detection exceptions appear as catalog warnings.
 

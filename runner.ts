@@ -194,6 +194,7 @@ export class TestRunner {
 				validateCommand(command);
 				job.command = displayCommand(command);
 				const formatter = adapter.createOutputFormatter?.();
+				if (formatter?.results) job.results = formatter.results;
 				let timedOut = false;
 				for (const [index, step] of [
 					command,
@@ -286,6 +287,7 @@ export class TestRunner {
 						throw new Error("Adapter returned invalid results");
 					}
 				} catch (cause) {
+					job.results = [];
 					const error = cause as NodeJS.ErrnoException;
 					append(
 						`\nTest Studio: no readable test results (${error.code ?? error.message}). See process output.\n`,
@@ -314,6 +316,7 @@ export class TestRunner {
 					);
 				}
 			} catch (cause) {
+				job.results = [];
 				const error = cause as NodeJS.ErrnoException;
 				append(`\n${error.message}\n`);
 				job.status = cancelled() ? "cancelled" : "failed";

@@ -47,6 +47,8 @@ export type ResultContext = {
 export type OutputFormatter = {
 	write(chunk: string): string;
 	end(): string;
+	/** Optional live results; the final parsed report replaces these after the process exits. */
+	results?: Result[];
 };
 /** Adapters discover source without executing it and return literal process arguments. */
 export interface Adapter {
