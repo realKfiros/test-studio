@@ -1,7 +1,7 @@
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import Square from "lucide-react-native/icons/square";
 import RotateCw from "lucide-react-native/icons/rotate-cw";
-import { Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
 import styled from "styled-components/native";
 import { observer } from "mobx-react-lite";
 import studioStore from "../stores";
@@ -95,6 +95,18 @@ const ArtifactPath = styled(Caption)`
 	font-size: 11px;
 `;
 
+function RunClock({ startedAt, finishedAt }: { startedAt: number; finishedAt?: number }) {
+	const [now, setNow] = useState(Date.now);
+
+	useEffect(() => {
+		if (finishedAt) return;
+		const timer = setInterval(() => setNow(Date.now()), 100);
+		return () => clearInterval(timer);
+	}, [finishedAt]);
+
+	return <Caption>{duration((finishedAt ?? now) - startedAt)}</Caption>;
+}
+
 export const RunInspector = observer(function RunInspector() {
 	const run = studioStore.run;
 	if (!run) return <EmptyState description="Loading run…" />;
@@ -181,7 +193,7 @@ export const RunInspector = observer(function RunInspector() {
 				{!!failed.length && (
 					<StatusText $status="failed">{failed.length} files failed</StatusText>
 				)}
-				<Caption>{duration((run.finishedAt ?? Date.now()) - run.startedAt)}</Caption>
+				<RunClock key={run.id} startedAt={run.startedAt} finishedAt={run.finishedAt} />
 			</Summary>
 			<Jobs>
 				{run.jobs.map((item) => (
