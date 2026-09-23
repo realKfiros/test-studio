@@ -4,7 +4,7 @@
 [![MIT license](https://img.shields.io/badge/license-MIT-97c3a2)](LICENSE)
 [![Node.js 22+](https://img.shields.io/badge/node-%E2%89%A522-97c3a2)](https://nodejs.org/)
 
-Discover and run your tests from a local browser UI or the terminal. Test Studio finds test files and declarations automatically, with built-in support for **Bun tests**, **Maestro flows**, and **custom adapters**.
+Discover and run your tests from a local browser UI or the terminal. Test Studio finds test files and declarations automatically, with built-in support for **Bun tests**, **Maestro flows**, **Pest tests**, and **custom adapters**.
 
 ![Test explorer showing Bun suites and Maestro flows in a sample workspace](docs/images/explorer.png)
 
@@ -27,14 +27,14 @@ npx @kfiros/test-studio /path/to/project
 npx @kfiros/test-studio /path/to/project --port 4311
 ```
 
-You need **Node.js 22+** with either launcher. Install your project's dependencies and the tools for the tests you want to run: Bun for Bun tests, Maestro for mobile flows. The UI comes compiled in the package, so no frontend setup is needed. Ctrl+C stops the server and active test process.
+You need **Node.js 22+** with either launcher. Install your project's dependencies and the tools for the tests you want to run: Bun for Bun tests, Maestro for mobile flows, or PHP with Pest in your project for PHP tests. The UI comes compiled in the package, so no frontend setup is needed. Ctrl+C stops the server and active test process.
 
 Prefer a project dependency? Run `npm install --save-dev @kfiros/test-studio` or `bun add --dev @kfiros/test-studio`. The installed command is `test-studio`.
 
 ## What you can do
 
-- Browse tests across packages in a monorepo, with filters for runner, workspace, platform, test name, and tags.
-- Run a file, selected files, or individual statically named Bun tests.
+- Browse collapsible folders across a monorepo, filtering by runner, workspace, platform, tags, latest result, or search.
+- Run a folder, selected files, or individual statically named Bun and Pest tests.
 - Inspect Maestro flow steps and source, and pass a device ID or flow variables.
 - Follow live output and per-test results, stop a run, or rerun failed files.
 - Run the same selections from the terminal with exit codes for scripts and CI.
@@ -48,30 +48,39 @@ Bun and Maestro work out of the box. Adapters let other tools use the same disco
 | ---------------- | --------------------------------------------- | --------------------------------------------------- |
 | **Bun**          | JS/TS test files and static test declarations | Whole files or individual tests                     |
 | **Maestro**      | YAML flows, steps, tags, and platform hints   | Complete flows                                      |
+| **Pest**         | PHP tests, nested descriptions, and groups    | Whole files or static individual tests              |
 | **Your adapter** | Any file format you choose                    | A command that produces normalized results or JUnit |
 
-Register a local adapter alongside the built-ins:
+For a runner that writes JUnit, declare file patterns and a command directly in `test-studio.config.json`:
 
 ```json
 {
-	"adapters": ["bun", "maestro", "./tools/node-checks.mjs"]
+	"adapters": [
+		"bun",
+		"maestro",
+		{
+			"id": "node-checks",
+			"label": "Node checks",
+			"files": ["**/*.check.mjs"],
+			"executable": "node",
+			"args": [
+				"--test",
+				"--test-reporter=junit",
+				"--test-reporter-destination={report}",
+				"{file}"
+			]
+		}
+	]
 }
 ```
 
-Save this as `test-studio.config.json` and copy the included [Node checks adapter](examples/node-checks.mjs) to `tools/node-checks.mjs`. It runs files named `*.check.mjs` with Node's test runner:
+That's a complete adapter: Test Studio handles discovery, paths, reports, and process execution. No imports or adapter source file required. You can also export the same object from a [local module](examples/node-checks.mjs).
 
-```js
-// example.check.mjs
-import { test } from "node:test";
-import assert from "node:assert/strict";
-
-test("adds numbers", () => {
-	assert.equal(1 + 1, 2);
-});
-```
+Enable **Pest** with `"adapters": ["pest"]`, or configure its test paths and PHP working directory with `{ "use": "pest", "options": { ... } }`. Pest discovers nested tests and groups, with individual runs for static names. For projects using Docker Compose, add a `docker` entry to run inside an existing service and collect the JUnit report. See the [Pest and Docker examples](docs/adapters.md#pest).
 
 ```sh
 npx @kfiros/test-studio run --runner node-checks
+npx @kfiros/test-studio run --runner pest --file tests/Feature
 ```
 
 Adapters can also be installed npm packages. Install them in the project being tested, then add their package names to `adapters`. Supplying `adapters` replaces the default list, so include `bun` and `maestro` if you still want them.
@@ -80,9 +89,9 @@ See **[Writing adapters](docs/adapters.md)** for the interface, factory options,
 
 ## Use the browser UI
 
-1. Filter the catalog by runner or workspace. Press `/` to search filenames, test names, or tags.
-2. Open a file to inspect its tests, flow steps, or source.
-3. Select file checkboxes or individual Bun tests, then choose **Run selected**. Use **Run file**, **Run flow**, or a test's play button for an immediate run.
+1. Filter by runner, workspace, platform, tag, or latest result. Press `/` to search filenames, test names, or tags.
+2. Expand folders to browse the project. A folder checkbox selects its visible descendants; its play button runs them immediately. Folder actions follow the active filters.
+3. Open a file to inspect tests, flow steps, or source. Select files or individual Bun/Pest tests, then choose **Run selected**. Use **Run file**, **Run flow**, or a test's play button for an immediate run.
 4. Watch output and results. **Stop** cancels the active run; **Rerun failed** retries failed files with their original selections.
 
 ![A completed Bun run with live output, per-test results, and report location](docs/images/run-results.png)

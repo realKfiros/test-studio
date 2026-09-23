@@ -24,11 +24,19 @@ Output streams live, followed by per-file and per-test results, totals, duration
 
 Exit codes are `0` for a passing run, `1` for failures/timeouts/setup or selection errors, `130` after Ctrl+C, and `143` after SIGTERM. Cancellation stops the active process group and cancels queued files before exiting.
 
+## Browser folders and filters
+
+The explorer mirrors test file paths as collapsible folders. Folder checkboxes select/deselect visible runnable descendants, including nested folders. A mixed checkbox means only some files or individual cases are selected. Folder play buttons run those visible descendants as whole files. Unsupported files remain inspectable and are excluded from folder actions.
+
+Runner, workspace, platform, tag, latest result, and search filters combine. Search matches paths, test names, and tags. **Reset filters** clears them all. Folder actions and **Select visible** follow the filters; selections hidden by filters remain selected until explicitly cleared. **Run selected** includes those hidden selections.
+
+Latest result means the most recent run containing a file in this server session. **Not run** means no retained run includes it; restarting the server or pruning history resets that information. Results from individual test runs describe that selection, not every test in the file. **Expand all** and **Collapse all** affect the current folder tree.
+
 ## Discovery rules
 
 - Test files: `.test`, `.spec`, `_test`, `_spec` with JS/TS module extensions, plus JS/TS files in `__tests__` directories.
 - Bun: explicit `bun:test` imports (including named aliases and namespace imports), or a Bun test script in the nearest package manifest for global-style tests.
-- Vitest, Jest, Node test, and Playwright imports are identified, and relevant package dependencies are listed. Bun and Maestro have built-in execution adapters. Other runners are shown without run controls unless a matching custom adapter is enabled.
+- Vitest, Jest, Node test, and Playwright imports are identified, and relevant package dependencies are listed. Bun and Maestro are enabled by default; Pest has an opt-in built-in adapter. Other runners are shown without run controls unless a matching custom adapter is enabled.
 - Maestro: YAML with an `appId` configuration document followed by a command sequence, including files inside `.maestro`. Names, tags, source lines, top-level steps, and filename-based iOS/Android hints are discovered.
 - Static nested suite names are combined into anchored, escaped Bun name filters. Parameterized tests, computed names, declarations inside helper callbacks/loops, and duplicate names are inspectable but require file-level runs. Runtime-generated test counts may differ from declaration counts.
 - Existing `bunfig.toml` is respected by running from the nearest config directory, otherwise from the scan root. Maestro runs from the nearest package directory. Arbitrary package.json shell scripts are never executed. Script-only setup/preload flags need to live in native runner configuration or the environment.
@@ -51,11 +59,11 @@ Place one `test-studio.config.json`, `.ts`, `.mts`, `.cts`, `.js`, `.mjs`, or `.
 }
 ```
 
-All options are optional. The default adapters are `["bun", "maestro"]`; supplying `adapters` replaces that list, and an empty list disables execution adapters. Use a module path or an installed package name for an external adapter. Factory exports receive options from entries such as `{ "use": "test-studio-adapter-example", "options": { "project": "web" } }`. Modules are resolved from the config directory, so plugins installed in the target project work when the CLI is launched with npx.
+All options are optional. The default adapters are `["bun", "maestro"]`; supplying `adapters` replaces that list, and an empty list disables execution adapters. Add `"pest"` for PHP tests. Command adapters can be declared inline with `id`, `files`, `executable`, and `args`; see [Writing adapters](adapters.md) for placeholders, Pest options, and Docker Compose support. Use a module path or an installed package name for an external adapter. Factory exports receive options from entries such as `{ "use": "test-studio-adapter-example", "options": { "project": "web" } }`. Modules are resolved from the config directory, so plugins installed in the target project work when the CLI is launched with npx.
 
 `--port` overrides config; port `0` picks a free port. Restart Test Studio after changing configuration or adapter code. The ignore file is reread on each scan. A custom `ignoreFile` path is relative to the project root and must exist; `false` disables it. `name` overrides the project name in the UI, and `timeoutMs` sets each job's time limit.
 
-The SDK exports `defineConfig`, `defineAdapter`, and their types from `@kfiros/test-studio` for editor assistance. Configs can also export plain objects without importing Test Studio. The [JSON schema](../schema.json) can be referenced locally as `./node_modules/@kfiros/test-studio/schema.json` when the package is installed.
+The SDK exports `defineConfig`, `defineAdapter`, `defineCommandAdapter`, `createPestAdapter`, `withDockerCompose`, and their types from `@kfiros/test-studio` for editor assistance. Configs can also export plain objects without importing Test Studio. The [JSON schema](../schema.json) can be referenced locally as `./node_modules/@kfiros/test-studio/schema.json` when the package is installed.
 
 ## Ignore rules
 

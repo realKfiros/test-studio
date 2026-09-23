@@ -52,7 +52,7 @@ The UI is an Expo web app built with React Native, `styled-components/native`, a
 | `ui/styles/`                             | Styles reused by multiple components                              |
 | `ui/stores/studioStore.ts`               | Observable state, computed values, polling, and actions           |
 | `ui/stores/poll.ts`                      | Abortable polling and disposal                                    |
-| `ui/model.ts`                            | Pure filtering and selection helpers                              |
+| `ui/model.ts`, `ui/catalog.ts`           | Pure filtering, folder trees, and selection helpers               |
 | `ui/api.ts`                              | Requests to the local API                                         |
 | `ui/session.web.ts`, `ui/hooks/*.web.ts` | Browser-specific integration                                      |
 
@@ -104,16 +104,17 @@ Use sample projects for screenshots, with no private paths, credentials, or cust
 
 ## Working on the CLI and adapters
 
-| Location                              | Responsibility                                                     |
-| ------------------------------------- | ------------------------------------------------------------------ |
-| `cli.ts`                              | Arguments, help, version, initialization, UI/headless entry points |
-| `config.ts`                           | Project config, ignore settings, adapter module loading            |
-| `discovery.ts`, `detectors.ts`        | File traversal and static test discovery                           |
-| `adapter.ts`, `adapters/`             | Adapter contract and built-in Bun/Maestro adapters                 |
-| `runner.ts`, `reports.ts`             | Process queue, cancellation, timeouts, and results                 |
-| `terminal.ts`                         | Headless selection, streamed output, and exit codes                |
-| `server.ts`, `web-assets.ts`          | Local API, session checks, and static asset serving                |
-| `index.ts`, `types.ts`, `schema.json` | Public SDK, shared types, and config schema                        |
+| Location                                                     | Responsibility                                                     |
+| ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| `cli.ts`                                                     | Arguments, help, version, initialization, UI/headless entry points |
+| `config.ts`                                                  | Project config, ignore settings, adapter module loading            |
+| `discovery.ts`, `detectors.ts`, `adapters/pest-discovery.ts` | File traversal and static JS/PHP test discovery                    |
+| `adapter.ts`, `adapters/`                                    | Adapter contract and built-in Bun/Maestro/Pest adapters            |
+| `adapters/command-adapter.ts`, `adapters/docker-compose.ts`  | Declarative adapters and Compose execution                         |
+| `runner.ts`, `reports.ts`                                    | Process queue, cancellation, timeouts, and results                 |
+| `terminal.ts`                                                | Headless selection, streamed output, and exit codes                |
+| `server.ts`, `web-assets.ts`                                 | Local API, session checks, and static asset serving                |
+| `index.ts`, `types.ts`, `schema.json`                        | Public SDK, shared types, and config schema                        |
 
 Discovery must not execute test source. Adapters return literal executable/argument arrays; the runner owns process lifecycle and report storage. Preserve selection boundaries when files change, and keep config/schema/types aligned when introducing options.
 
@@ -148,14 +149,14 @@ Prettier uses tabs, double quotes, semicolons, LF endings, and a 100-column prin
 
 Choose checks that cover the change:
 
-| Change                          | Useful checks                                                                     |
-| ------------------------------- | --------------------------------------------------------------------------------- |
-| Documentation                   | `npm run format:check`; check links, screenshots, and command examples            |
-| UI presentation                 | `npm run lint`, `npm run typecheck`, `npm run build:ui`, browser checks           |
-| UI state or selection           | `bun test ./tests/studio-store.test.ts ./tests/ui-model.test.ts`                  |
-| Discovery, adapters, or API     | `npm run build:ui`, then `bun test ./tests/studio.test.ts ./tests/config.test.ts` |
-| Terminal behavior               | `bun test ./tests/terminal.test.ts`                                               |
-| Dependencies, SDK, or packaging | `npm run test:package`                                                            |
+| Change                          | Useful checks                                                                                              |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Documentation                   | `npm run format:check`; check links, screenshots, and command examples                                     |
+| UI presentation                 | `npm run lint`, `npm run typecheck`, `npm run build:ui`, browser checks                                    |
+| UI state or selection           | `bun test ./tests/studio-store.test.ts ./tests/ui-model.test.ts ./tests/catalog.test.ts`                   |
+| Discovery, adapters, or API     | `npm run build:ui`, then `bun test ./tests/studio.test.ts ./tests/config.test.ts ./tests/adapters.test.ts` |
+| Terminal behavior               | `bun test ./tests/terminal.test.ts`                                                                        |
+| Dependencies, SDK, or packaging | `npm run test:package`                                                                                     |
 
 Run the complete verification before a release or a broad change:
 
