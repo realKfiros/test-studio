@@ -1,4 +1,13 @@
-import type { Catalog, Job, Run, RunOptions, Selection, Status, TestFile } from "../types.ts";
+import type {
+	Catalog,
+	Job,
+	Result,
+	Run,
+	RunOptions,
+	Selection,
+	Status,
+	TestFile,
+} from "../types.ts";
 
 export type RunSummary = Omit<Run, "jobs"> & {
 	jobs: (Pick<
@@ -112,3 +121,57 @@ export const duration = (ms: number) =>
 		: ms < 60000
 			? `${(ms / 1000).toFixed(1)}s`
 			: `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
+
+export type FailureLocation = { line: number; exact: boolean };
+
+function referencedLines(text: string, filePath: string): number[] {
+	const path = filePath.replaceAll("\\", "/");
+	const matches: number[] = [];
+	for (const line of text.split(/\r?\n/)) {
+		const normalized = line.replaceAll("\\", "/");
+		let offset = 0;
+		while ((offset = normalized.indexOf(path, offset)) !== -1) {
+			const before = normalized[offset - 1];
+			const after = normalized.slice(offset + path.length);
+			const location = /^(?::(\d+)(?::\d+)?|\((\d+)\)|\s+(?:on\s+)?line\s+(\d+))/i.exec(
+				after,
+			);
+			if ((!before || before === "/" || /[\s("'`]/.test(before)) && location) {
+				const number = Number(location[1] ?? location[2] ?? location[3]);
+				if (Number.isSafeInteger(number) && number > 0) matches.push(number);
+			}
+			offset += path.length;
+		}
+	}
+	return matches;
+}
+
+/** Resolve a failure to the selected test file without opening arbitrary stack-trace paths. */
+export function failureLocation(
+	file: TestFile,
+	result: Result,
+	output: string,
+): FailureLocation | null {
+	const reported = referencedLines(result.message ?? "", file.path)[0];
+	if (reported) return { line: reported, exact: true };
+
+	const names = new Set([result.name, result.name.split(" › ").at(-1)]);
+	const lines = output.split(/\r?\n/);
+	let start = 0;
+	for (let index = 0; index < lines.length; index++) {
+		if (!lines[index].startsWith("(fail) ")) continue;
+		const label = lines[index].slice(7).replace(/\s+\[[^\]]+\]$/, "");
+		if (names.has(label)) {
+			const found = referencedLines(lines.slice(start, index).join("\n"), file.path).at(-1);
+			if (found) return { line: found, exact: true };
+		}
+		start = index + 1;
+	}
+
+	const matchingCases = file.cases.filter(
+		(test) => names.has(test.fullName) || names.has(test.name),
+	);
+	return matchingCases.length === 1 && matchingCases[0].line > 0
+		? { line: matchingCases[0].line, exact: false }
+		: null;
+}

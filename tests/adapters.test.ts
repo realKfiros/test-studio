@@ -393,11 +393,16 @@ test("Pest live output formats split, escaped, failed, and skipped events", () =
 	expect(formatter.write("here' flowId='1']\n")).toBe("RUN fails | here\n");
 	expect(
 		formatter.write(
-			"##teamcity[testFailed name='fails || here' message='oops|nmore' flowId='1']\n",
+			"##teamcity[testFailed name='fails || here' message='oops|nmore' details='at /app/tests/ExampleTest.php:11' flowId='1']\n",
 		),
 	).toBe("FAIL fails | here: oops\n");
 	expect(formatter.results).toEqual([
-		{ name: "fails | here", status: "failed", duration: 0, message: "oops\nmore" },
+		{
+			name: "fails | here",
+			status: "failed",
+			duration: 0,
+			message: "oops\nmore\nat /app/tests/ExampleTest.php:11",
+		},
 	]);
 	expect(
 		formatter.write("##teamcity[testFinished name='fails || here' duration='31' flowId='1']\n"),
@@ -410,7 +415,12 @@ test("Pest live output formats split, escaped, failed, and skipped events", () =
 	).toBe("SKIP skipped: not ready\n");
 	expect(formatter.write("##teamcity[testFinished name='skipped' flowId='1']\n")).toBe("");
 	expect(formatter.results).toEqual([
-		{ name: "fails | here", status: "failed", duration: 31, message: "oops\nmore" },
+		{
+			name: "fails | here",
+			status: "failed",
+			duration: 31,
+			message: "oops\nmore\nat /app/tests/ExampleTest.php:11",
+		},
 		{ name: "skipped", status: "skipped", duration: 0, message: "not ready" },
 	]);
 	expect(formatter.write("Tests: 2")).toBe("");

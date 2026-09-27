@@ -3,6 +3,7 @@ import { discoverScript } from "../detectors.ts";
 import type { Catalog, TestFile } from "../types.ts";
 import {
 	defaultFilters,
+	failureLocation,
 	filterFiles,
 	reconcileSelection,
 	runOptions,
@@ -103,4 +104,48 @@ test("run settings preserve equals signs in values and reject malformed names", 
 	});
 	expect(() => runOptions("", "invalid line")).toThrow("NAME=value");
 	expect(() => runOptions("", "BAD-NAME=value")).toThrow("NAME=value");
+});
+
+test("failure locations prefer exact test-file frames over declarations", () => {
+	const testFile: TestFile = {
+		...file,
+		cases: [
+			{ ...file.cases[0], name: "first failure", fullName: "first failure", line: 2 },
+			{ ...file.cases[1], name: "second failure", fullName: "second failure", line: 5 },
+		],
+	};
+	const output = [
+		"at <anonymous> (/project/tests/example.test.ts:3:13)",
+		"(fail) first failure [3ms]",
+		"at <anonymous> (/project/tests/example.test.ts:6:15)",
+		"(fail) second failure [1ms]",
+	].join("\n");
+	const failed = (name: string, message?: string) => ({
+		name,
+		status: "failed" as const,
+		duration: 1,
+		message,
+	});
+	expect(failureLocation(testFile, failed("first failure"), output)).toEqual({
+		line: 3,
+		exact: true,
+	});
+	expect(failureLocation(testFile, failed("second failure"), output)).toEqual({
+		line: 6,
+		exact: true,
+	});
+	expect(
+		failureLocation(
+			testFile,
+			failed("second failure", "assertion at /app/tests/example.test.ts:9"),
+			output,
+		),
+	).toEqual({ line: 9, exact: true });
+	expect(failureLocation(testFile, failed("first failure"), "")).toEqual({
+		line: 2,
+		exact: false,
+	});
+	expect(
+		failureLocation(testFile, failed("unknown", "at /app/other/example.test.ts:44"), ""),
+	).toBeNull();
 });

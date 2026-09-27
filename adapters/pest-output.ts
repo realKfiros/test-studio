@@ -49,7 +49,12 @@ export function createPestOutputFormatter(): OutputFormatter {
 				active.delete(key);
 				return name ? `RUN ${name}\n` : "";
 			case "testFailed":
-				record(key, name, "failed", values.message);
+				record(
+					key,
+					name,
+					"failed",
+					[values.message, values.details].filter(Boolean).join("\n") || undefined,
+				);
 				return `FAIL ${name ?? "test"}${values.message ? `: ${values.message.split("\n")[0]}` : ""}\n`;
 			case "testIgnored":
 				record(key, name, "skipped", values.message);
