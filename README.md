@@ -36,7 +36,7 @@ Prefer a project dependency? Run `npm install --save-dev @kfiros/test-studio` or
 - Browse collapsible folders across a monorepo, filtering by runner, workspace, platform, tags, latest result, or search.
 - Run a folder, selected files, or individual statically named Bun and Pest tests.
 - Inspect Maestro flow steps and source, and pass a device ID or flow variables.
-- Follow live output and per-test results, stop a run, or rerun failed files.
+- Follow live output and per-test results, inspect failed test code, stop a run, or rerun failed files.
 - Run the same selections from the terminal with exit codes for scripts and CI.
 - Add another test framework through an adapter in your project or an installed package.
 
@@ -92,7 +92,7 @@ See **[Writing adapters](docs/adapters.md)** for the interface, factory options,
 1. Filter by runner, workspace, platform, tag, or latest result. Press `/` to search filenames, test names, or tags.
 2. Expand folders to browse the project. A folder checkbox selects its visible descendants; its play button runs them immediately. Folder actions follow the active filters.
 3. Open a file to inspect tests, flow steps, or source. Select files or individual Bun/Pest tests, then choose **Run selected**. Use **Run file**, **Run flow**, or a test's play button for an immediate run.
-4. Watch output and results. **Stop** cancels the active run; **Rerun failed** retries failed files with their original selections.
+4. Watch output and results. Choose **Code** on a failed test to see its test file with the reported failure line highlighted. When no exact line is reported, Test Studio shows the test declaration or the file source. **Stop** cancels the active run; **Rerun failed** retries failed files with their original selections.
 
 ![A completed Bun run with live output, per-test results, and report location](docs/images/run-results.png)
 

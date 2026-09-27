@@ -161,6 +161,40 @@ describe("StudioStore", () => {
 		expect(store.source).toBeNull();
 	});
 
+	test("failed-run code view loads the selected job source and abandons stale requests", async () => {
+		const { store, take, connect } = harness();
+		await connect();
+		store.openRun("failed");
+		take("/api/runs/failed").resolve({
+			...completedRun("failed"),
+			status: "failed",
+			jobs: files.map((file, index) => ({
+				id: String(index),
+				file,
+				selection: { fileId: file.id },
+				status: "failed",
+				command: "",
+				output: "",
+				results: [{ name: "one", status: "failed", duration: 1 }],
+			})),
+		});
+		await flush();
+		store.openFailure(0);
+		expect(store.runPanel).toBe("code");
+		const first = take(`/api/source?id=${files[0].id}`);
+		store.selectJob("1");
+		expect(first.signal?.aborted).toBe(true);
+		expect(store.runPanel).toBe("output");
+		store.setRunPanel("code");
+		take(`/api/source?id=${files[1].id}`).resolve({ source: "second source" });
+		await flush();
+		first.resolve({ source: "stale first source" });
+		await flush();
+		expect(store.source).toBe("second source");
+		store.showFiles();
+		expect(store.source).toBeNull();
+	});
+
 	test("one start request preserves selected cases and settings, and stop targets that run", async () => {
 		const { store, take, requests, connect } = harness();
 		await connect();

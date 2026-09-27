@@ -1,6 +1,7 @@
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import Square from "lucide-react-native/icons/square";
 import RotateCw from "lucide-react-native/icons/rotate-cw";
+import Code2 from "lucide-react-native/icons/code-xml";
 import { Fragment, useEffect, useState } from "react";
 import styled from "styled-components/native";
 import { observer } from "mobx-react-lite";
@@ -13,6 +14,7 @@ import { Button } from "./Button";
 import { Badge } from "./Badge";
 import { EmptyState } from "./EmptyState";
 import { LiveOutput } from "./LiveOutput";
+import { FailureCodeView } from "./FailureCodeView";
 
 const BackRow = styled.View`
 	align-items: flex-start;
@@ -82,6 +84,22 @@ const ResultMessage = styled(MonoText)`
 	font-size: 10px;
 	color: ${({ theme }) => theme.colors.danger};
 `;
+const OutputTabs = styled.View`
+	flex-direction: row;
+	gap: 20px;
+	padding: 0px 24px;
+	border-bottom-width: 1px;
+	border-color: ${({ theme }) => theme.colors.border};
+`;
+const OutputTab = styled.Pressable<{ $active: boolean }>`
+	padding: 9px 0px;
+	border-bottom-width: 2px;
+	border-bottom-color: ${({ $active, theme }) => ($active ? theme.colors.accent : "transparent")};
+`;
+const OutputTabLabel = styled(BodyText)<{ $active: boolean }>`
+	font-size: 12px;
+	color: ${({ $active, theme }) => ($active ? theme.colors.secondaryText : theme.colors.muted)};
+`;
 const Meta = styled.View`
 	flex-direction: row;
 	align-items: center;
@@ -110,15 +128,19 @@ function RunClock({ startedAt, finishedAt }: { startedAt: number; finishedAt?: n
 export const RunInspector = observer(function RunInspector() {
 	const run = studioStore.run;
 	if (!run) return <EmptyState description="Loading run…" />;
-	const job =
-		run.jobs.find((job) => job.id === studioStore.jobId) ??
-		run.jobs.find((job) => job.status === "running") ??
-		run.jobs[0];
+	const job = studioStore.currentJob;
 	if (!job) return <EmptyState description="No files in this run." />;
 	const results = run.jobs.flatMap((job) => job.results);
 	const counts = (status: string) => results.filter((result) => result.status === status).length;
 	const completed = run.jobs.filter((job) => !["queued", "running"].includes(job.status)).length;
 	const failed = run.jobs.filter((job) => job.status === "failed");
+	const firstFailure = job.results.findIndex((result) => result.status === "failed");
+	const selectedFailure =
+		studioStore.failureIndex !== null &&
+		job.results[studioStore.failureIndex]?.status === "failed"
+			? studioStore.failureIndex
+			: firstFailure;
+	const codeOpen = studioStore.runPanel === "code" && selectedFailure >= 0;
 	return (
 		<>
 			<InspectorHeading>
@@ -219,15 +241,38 @@ export const RunInspector = observer(function RunInspector() {
 				{job.command || "Waiting in queue…"}
 				{"\n"}cwd: {job.file.cwd}
 			</Command>
-			<LiveOutput
-				jobId={job.id}
-				output={
-					job.output ||
-					(job.status === "queued"
-						? "Waiting for the previous file to finish…"
-						: "Waiting for runner output…")
-				}
-			/>
+			{firstFailure >= 0 && (
+				<OutputTabs accessibilityRole="tablist" accessibilityLabel="Run details">
+					{(["output", "code"] as const).map((panel) => (
+						<OutputTab
+							key={panel}
+							accessibilityRole="tab"
+							aria-selected={codeOpen ? panel === "code" : panel === "output"}
+							$active={codeOpen ? panel === "code" : panel === "output"}
+							onPress={() => studioStore.setRunPanel(panel)}
+						>
+							<OutputTabLabel
+								$active={codeOpen ? panel === "code" : panel === "output"}
+							>
+								{panel === "code" ? "Code" : "Output"}
+							</OutputTabLabel>
+						</OutputTab>
+					))}
+				</OutputTabs>
+			)}
+			{codeOpen ? (
+				<FailureCodeView job={job} result={job.results[selectedFailure]} />
+			) : (
+				<LiveOutput
+					jobId={job.id}
+					output={
+						job.output ||
+						(job.status === "queued"
+							? "Waiting for the previous file to finish…"
+							: "Waiting for runner output…")
+					}
+				/>
+			)}
 			{!!job.results.length && (
 				<Results>
 					{job.results.map((result, index) => (
@@ -242,6 +287,16 @@ export const RunInspector = observer(function RunInspector() {
 								</StatusText>
 								<JobName>{result.name}</JobName>
 								<Caption>{duration(result.duration)}</Caption>
+								{result.status === "failed" && (
+									<Button
+										icon={Code2}
+										compact
+										variant="quiet"
+										onPress={() => studioStore.openFailure(index)}
+									>
+										Code
+									</Button>
+								)}
 							</ResultRow>
 							{!!result.message && (
 								<ResultMessage selectable>{result.message}</ResultMessage>

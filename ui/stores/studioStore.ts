@@ -28,6 +28,8 @@ export class StudioStore {
 	runId: string | null = null;
 	private runDetails: Run | null = null;
 	jobId: string | null = null;
+	runPanel: "output" | "code" = "output";
+	failureIndex: number | null = null;
 	tab: "tests" | "source" = "tests";
 	device = "";
 	variables = "";
@@ -151,6 +153,15 @@ export class StudioStore {
 		return this.runDetails?.id === this.runId ? this.runDetails : null;
 	}
 
+	get currentJob() {
+		const jobs = this.run?.jobs ?? [];
+		return (
+			jobs.find((job) => job.id === this.jobId) ??
+			jobs.find((job) => job.status === "running") ??
+			jobs[0]
+		);
+	}
+
 	get busy() {
 		return (
 			this.starting ||
@@ -179,7 +190,11 @@ export class StudioStore {
 		);
 		const disposeSource = reaction(
 			() =>
-				this.view === "file" && this.tab === "source" ? this.currentFile?.id : undefined,
+				this.view === "file" && this.tab === "source"
+					? this.currentFile?.id
+					: this.view === "run" && this.runPanel === "code"
+						? this.currentJob?.file.id
+						: undefined,
 			(id) => {
 				stopSource();
 				stopSource = this.loadSource(id);
@@ -308,6 +323,18 @@ export class StudioStore {
 	}
 	selectJob(id: string) {
 		this.jobId = id;
+		this.runPanel = "output";
+		this.failureIndex = null;
+	}
+	setRunPanel(panel: "output" | "code") {
+		this.runPanel = panel;
+	}
+	openFailure(index: number) {
+		const job = this.currentJob;
+		if (job?.results[index]?.status !== "failed") return;
+		this.jobId = job.id;
+		this.failureIndex = index;
+		this.runPanel = "code";
 	}
 	setDevice(device: string) {
 		this.device = device;
@@ -335,6 +362,8 @@ export class StudioStore {
 	openRun(id: string) {
 		this.runId = id;
 		this.jobId = null;
+		this.runPanel = "output";
+		this.failureIndex = null;
 		this.view = "run";
 	}
 
